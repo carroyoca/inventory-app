@@ -6,7 +6,7 @@ A modern, full-stack web application for managing art collections with ease. Bui
 
 - **🔐 User Authentication** - Secure sign-up and login system
 - **📱 Responsive Design** - Mobile-first approach with modern UI
-- **🖼️ Photo Management** - Upload and organize artwork photos
+- **🖼️ Photo Management** - Upload and organize artwork photos via Vercel Blob
 - **💰 Pricing Tracking** - Monitor estimated and sale prices
 - **📍 Location Management** - Organize items by house zones
 - **🔍 Search & Filter** - Find items quickly and efficiently
@@ -110,3 +110,10 @@ This project is licensed under the MIT License.
 - UI components from [shadcn/ui](https://ui.shadcn.com/)
 - Styling with [Tailwind CSS](https://tailwindcss.com/)
 - Backend powered by [Supabase](https://supabase.com/)
+
+## 🚀 Latest Updates
+
+- **Photo uploads** now working with Vercel Blob
+- **Improved error handling** for better user experience
+- **Database integration** fully functional
+- **Authentication flow** optimized and working
