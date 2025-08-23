@@ -85,13 +85,17 @@ export function InventoryForm() {
           body: formData,
         })
 
-        if (!response.ok) throw new Error("Upload failed")
+        if (!response.ok) {
+          const errorData = await response.json().catch(() => ({}))
+          throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
+        }
 
         const uploadedPhoto: UploadedPhoto = await response.json()
         setUploadedPhotos((prev) => [...prev, uploadedPhoto])
       } catch (error) {
         console.error("Error uploading photo:", error)
-        alert(`Failed to upload ${file.name}`)
+        const errorMessage = error instanceof Error ? error.message : "Upload failed"
+        alert(`Failed to upload ${file.name}: ${errorMessage}`)
       } finally {
         // Mark this photo as done uploading
         setUploadingPhotos((prev) => {
@@ -134,6 +138,12 @@ export function InventoryForm() {
       const formData = new FormData(e.currentTarget)
       const supabase = createClient()
 
+      // Check if user is authenticated
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) {
+        throw new Error("You must be logged in to add inventory items")
+      }
+
       // Use uploaded photo URLs
       const photoUrls = uploadedPhotos.map((photo) => photo.url)
 
@@ -150,9 +160,19 @@ export function InventoryForm() {
         status: formData.get("status"),
         listing_link: formData.get("listing_link"),
         photos: photoUrls,
+        created_by: user.id,
       })
 
-      if (error) throw error
+      if (error) {
+        console.error("Database error:", error)
+        if (error.code === '42P01') {
+          throw new Error("Database table not found. Please contact support.")
+        } else if (error.code === '23505') {
+          throw new Error("An item with this ID already exists.")
+        } else {
+          throw new Error(`Database error: ${error.message}`)
+        }
+      }
 
       // Reset form
       e.currentTarget.reset()
@@ -165,7 +185,8 @@ export function InventoryForm() {
       router.refresh()
     } catch (error) {
       console.error("Error adding inventory item:", error)
-      alert("Error adding item. Please try again.")
+      const errorMessage = error instanceof Error ? error.message : "Error adding item. Please try again."
+      alert(errorMessage)
     } finally {
       setIsSubmitting(false)
     }
