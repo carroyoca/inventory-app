@@ -66,6 +66,8 @@ export function InventoryForm() {
     const files = Array.from(e.target.files || [])
     if (files.length === 0) return
 
+    console.log("Starting photo upload for", files.length, "files")
+
     // Add files to display immediately
     setPhotos((prev) => [...prev, ...files])
 
@@ -76,21 +78,29 @@ export function InventoryForm() {
     // Upload each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
+      console.log("Uploading file:", file.name, "Size:", file.size, "Type:", file.type)
+      
       const formData = new FormData()
       formData.append("file", file)
 
       try {
+        console.log("Sending upload request to /api/upload")
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
         })
 
+        console.log("Upload response status:", response.status)
+        console.log("Upload response headers:", response.headers)
+
         if (!response.ok) {
           const errorData = await response.json().catch(() => ({}))
+          console.error("Upload failed with error data:", errorData)
           throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
         }
 
         const uploadedPhoto: UploadedPhoto = await response.json()
+        console.log("Upload successful:", uploadedPhoto)
         setUploadedPhotos((prev) => [...prev, uploadedPhoto])
       } catch (error) {
         console.error("Error uploading photo:", error)
@@ -174,8 +184,12 @@ export function InventoryForm() {
         }
       }
 
-      // Reset form
-      e.currentTarget.reset()
+      // Reset form safely
+      if (e.currentTarget && typeof e.currentTarget.reset === 'function') {
+        e.currentTarget.reset()
+      }
+      
+      // Reset state
       setPhotos([])
       setUploadedPhotos([])
       setUploadingPhotos([])
