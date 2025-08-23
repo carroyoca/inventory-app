@@ -67,6 +67,8 @@ export function InventoryForm() {
     if (files.length === 0) return
 
     console.log("Starting photo upload for", files.length, "files")
+    console.log("User Agent:", navigator.userAgent)
+    console.log("Is Mobile:", /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
 
     // Add files to display immediately
     setPhotos((prev) => [...prev, ...files])
@@ -78,17 +80,37 @@ export function InventoryForm() {
     // Upload each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      console.log("Uploading file:", file.name, "Size:", file.size, "Type:", file.type)
+      console.log("Uploading file:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB"
+      })
+      
+      // Check file size for mobile
+      const fileSizeMB = file.size / (1024 * 1024)
+      if (fileSizeMB > 50) {
+        console.warn("Large file detected:", fileSizeMB.toFixed(2) + " MB")
+        alert(`File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`)
+      }
       
       const formData = new FormData()
       formData.append("file", file)
 
       try {
         console.log("Sending upload request to /api/upload")
+        
+        // Add timeout for mobile uploads
+        const controller = new AbortController()
+        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+        
         const response = await fetch("/api/upload", {
           method: "POST",
           body: formData,
+          signal: controller.signal
         })
+        
+        clearTimeout(timeoutId)
 
         console.log("Upload response status:", response.status)
         console.log("Upload response headers:", response.headers)
@@ -104,7 +126,16 @@ export function InventoryForm() {
         setUploadedPhotos((prev) => [...prev, uploadedPhoto])
       } catch (error) {
         console.error("Error uploading photo:", error)
-        const errorMessage = error instanceof Error ? error.message : "Upload failed"
+        let errorMessage = "Upload failed"
+        
+        if (error instanceof Error) {
+          if (error.name === 'AbortError') {
+            errorMessage = "Upload timed out. Please try again."
+          } else {
+            errorMessage = error.message
+          }
+        }
+        
         alert(`Failed to upload ${file.name}: ${errorMessage}`)
       } finally {
         // Mark this photo as done uploading
@@ -306,14 +337,25 @@ export function InventoryForm() {
         <Label className="text-sm font-medium">Photos</Label>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-            <Input
-              type="file"
-              accept="image/*"
-              multiple
-              onChange={handlePhotoUpload}
-              className="hidden"
-              id="photo-upload"
-            />
+            {/* Photo Upload */}
+            <div className="space-y-2">
+              <Label htmlFor="photos" className="text-sm font-medium">
+                Photos
+              </Label>
+              <Input
+                id="photos"
+                type="file"
+                multiple
+                accept="image/*"
+                capture="environment"
+                onChange={handlePhotoUpload}
+                className="h-11 sm:h-10"
+                disabled={isSubmitting}
+              />
+              <p className="text-xs text-gray-500">
+                Upload photos of your art piece. Supported formats: JPG, PNG, GIF, WebP. Max size: 50MB per photo.
+              </p>
+            </div>
             <Button
               type="button"
               variant="outline"
