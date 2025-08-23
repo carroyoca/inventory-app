@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button"
 import { MapPin, DollarSign, ExternalLink, Edit, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
+import { useRouter } from "next/navigation"
 
 interface InventoryItem {
   id: string
@@ -25,6 +26,7 @@ interface InventoryItem {
 
 interface InventoryGridProps {
   items: InventoryItem[]
+  onItemDeleted?: (id: string) => void
 }
 
 const statusColors = {
@@ -34,17 +36,40 @@ const statusColors = {
   not_for_sale: "bg-gray-100 text-gray-800",
 }
 
-export function InventoryGrid({ items }: InventoryGridProps) {
+export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
+  const router = useRouter()
+
   const handleDelete = async (id: string) => {
     if (!confirm("Are you sure you want to delete this item?")) return
 
     try {
-      // TODO: Implement delete functionality
-      console.log("Delete item:", id)
+      const response = await fetch("/api/delete-item", {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id }),
+      })
+
+      if (!response.ok) {
+        throw new Error("Failed to delete item")
+      }
+
+      // Call the callback to update the parent component
+      if (onItemDeleted) {
+        onItemDeleted(id)
+      }
+
+      console.log("Item deleted successfully:", id)
     } catch (error) {
       console.error("Error deleting item:", error)
       alert("Error deleting item. Please try again.")
     }
+  }
+
+  const handleEdit = (item: InventoryItem) => {
+    // Navigate to edit page with item data
+    // For now, we'll navigate to the inventory page with edit mode
+    // You can implement a proper edit form later
+    router.push(`/inventory?edit=${item.id}`)
   }
 
   return (
@@ -110,7 +135,7 @@ export function InventoryGrid({ items }: InventoryGridProps) {
 
               {/* Actions */}
               <div className="flex items-center gap-2 pt-2 border-t">
-                <Button variant="outline" size="sm" className="flex-1 h-9 text-xs sm:text-sm bg-transparent">
+                <Button variant="outline" size="sm" className="flex-1 h-9 text-xs sm:text-sm bg-transparent" onClick={() => handleEdit(item)}>
                   <Edit className="h-3 w-3 mr-1" />
                   Edit
                 </Button>

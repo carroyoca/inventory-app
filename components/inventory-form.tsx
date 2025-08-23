@@ -422,7 +422,6 @@ export function InventoryForm() {
                 type="file"
                 multiple
                 accept="image/*"
-                capture="environment"
                 onChange={handlePhotoUpload}
                 className="h-11 sm:h-10"
                 disabled={isSubmitting}
@@ -434,7 +433,7 @@ export function InventoryForm() {
             <Button
               type="button"
               variant="outline"
-              onClick={() => document.getElementById("photo-upload")?.click()}
+              onClick={() => document.getElementById("photos")?.click()}
               className="h-11 sm:h-10 w-full sm:w-auto"
             >
               <Upload className="h-4 w-4 mr-2" />
@@ -443,6 +442,43 @@ export function InventoryForm() {
             <span className="text-sm text-gray-500 text-center sm:text-left">
               {photos.length} photo{photos.length !== 1 ? "s" : ""} selected
             </span>
+          </div>
+
+          {/* Mobile Photo Picker */}
+          <div className="sm:hidden">
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const input = document.getElementById("photos") as HTMLInputElement
+                  if (input) {
+                    input.removeAttribute("capture")
+                    input.click()
+                  }
+                }}
+                className="flex-1"
+              >
+                📁 Gallery
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  const input = document.getElementById("photos") as HTMLInputElement
+                  if (input) {
+                    input.setAttribute("capture", "environment")
+                    input.click()
+                  }
+                }}
+                className="flex-1"
+              >
+                📷 Camera
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500 mt-2 text-center">
+              Choose how to add photos on mobile
+            </p>
           </div>
 
           {photos.length > 0 && (

@@ -110,6 +110,12 @@ export default function InventoryPage() {
     setFilteredItems(filtered)
   }
 
+  // Handle item deletion
+  const handleItemDeleted = (deletedId: string) => {
+    setItems(prevItems => prevItems.filter(item => item.id !== deletedId))
+    setFilteredItems(prevFiltered => prevFiltered.filter(item => item.id !== deletedId))
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
@@ -182,7 +188,7 @@ export default function InventoryPage() {
             </CardHeader>
             <CardContent>
               {filteredItems.length > 0 ? (
-                <InventoryGrid items={filteredItems} />
+                <InventoryGrid items={filteredItems} onItemDeleted={handleItemDeleted} />
               ) : items.length === 0 ? (
                 <div className="text-center py-12">
                   <Package className="h-12 w-12 text-gray-400 mx-auto mb-4" />
