@@ -69,6 +69,32 @@ export function InventoryForm() {
     console.log("Starting photo upload for", files.length, "files")
     console.log("User Agent:", navigator.userAgent)
     console.log("Is Mobile:", /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
+    console.log("Is iOS:", /iPad|iPhone|iPod/.test(navigator.userAgent))
+    console.log("Is Chrome:", /Chrome/.test(navigator.userAgent))
+    console.log("Event type:", e.type)
+    console.log("Event target:", e.target)
+    console.log("Files array:", files)
+
+    // iOS-specific file validation
+    for (let i = 0; i < files.length; i++) {
+      const file = files[i]
+      console.log("File details:", {
+        name: file.name,
+        size: file.size,
+        type: file.type,
+        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        lastModified: file.lastModified,
+        webkitRelativePath: (file as any).webkitRelativePath,
+        mozFullPath: (file as any).mozFullPath
+      })
+      
+      // Check if file is valid
+      if (!file.name || file.size === 0) {
+        console.error("Invalid file detected:", file)
+        alert(`File ${file.name || 'Unknown'} appears to be invalid. Please try selecting a different photo.`)
+        continue
+      }
+    }
 
     // Add files to display immediately
     setPhotos((prev) => [...prev, ...files])
@@ -80,7 +106,8 @@ export function InventoryForm() {
     // Upload each file
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
-      console.log("Uploading file:", {
+      console.log("Processing file for upload:", {
+        index: i,
         name: file.name,
         size: file.size,
         type: file.type,
@@ -94,59 +121,107 @@ export function InventoryForm() {
         alert(`File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`)
       }
       
-      const formData = new FormData()
-      formData.append("file", file)
-
-      try {
-        console.log("Sending upload request to /api/upload")
-        
-        // Add timeout for mobile uploads
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
-        
-        const response = await fetch("/api/upload", {
-          method: "POST",
-          body: formData,
-          signal: controller.signal
-        })
-        
-        clearTimeout(timeoutId)
-
-        console.log("Upload response status:", response.status)
-        console.log("Upload response headers:", response.headers)
-
-        if (!response.ok) {
-          const errorData = await response.json().catch(() => ({}))
-          console.error("Upload failed with error data:", errorData)
-          throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
+      // Try alternative upload method for iOS
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+      let uploadSuccess = false
+      
+      if (isIOS) {
+        console.log("iOS detected, trying alternative upload method")
+        try {
+          uploadSuccess = await uploadFileIOS(file)
+        } catch (error) {
+          console.log("iOS alternative upload failed, falling back to standard method")
         }
-
-        const uploadedPhoto: UploadedPhoto = await response.json()
-        console.log("Upload successful:", uploadedPhoto)
-        setUploadedPhotos((prev) => [...prev, uploadedPhoto])
-      } catch (error) {
-        console.error("Error uploading photo:", error)
-        let errorMessage = "Upload failed"
-        
-        if (error instanceof Error) {
-          if (error.name === 'AbortError') {
-            errorMessage = "Upload timed out. Please try again."
-          } else {
-            errorMessage = error.message
-          }
-        }
-        
-        alert(`Failed to upload ${file.name}: ${errorMessage}`)
-      } finally {
-        // Mark this photo as done uploading
-        setUploadingPhotos((prev) => {
-          const newStates = [...prev]
-          const photoIndex = photos.length - files.length + i
-          newStates[photoIndex] = false
-          return newStates
-        })
       }
+      
+      if (!uploadSuccess) {
+        // Standard upload method
+        try {
+          await uploadFileStandard(file)
+        } catch (error) {
+          console.error("Standard upload also failed:", error)
+          alert(`Failed to upload ${file.name}. Please try again or contact support.`)
+        }
+      }
+      
+      // Mark this photo as done uploading
+      setUploadingPhotos((prev) => {
+        const newStates = [...prev]
+        const photoIndex = photos.length - files.length + i
+        newStates[photoIndex] = false
+        return newStates
+      })
     }
+  }
+
+  const uploadFileIOS = async (file: File): Promise<boolean> => {
+    try {
+      console.log("Attempting iOS-specific upload for:", file.name)
+      
+      // Create a new FormData for iOS
+      const formData = new FormData()
+      formData.append("file", file, file.name) // Explicitly set filename
+      
+      // Add additional headers that might help with iOS
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        headers: {
+          // Don't set Content-Type for FormData on iOS
+        }
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`)
+      }
+      
+      const uploadedPhoto: UploadedPhoto = await response.json()
+      console.log("iOS upload successful:", uploadedPhoto)
+      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
+      return true
+      
+    } catch (error) {
+      console.error("iOS upload failed:", error)
+      return false
+    }
+  }
+
+  const uploadFileStandard = async (file: File): Promise<void> => {
+    console.log("Using standard upload method for:", file.name)
+    
+    const formData = new FormData()
+    formData.append("file", file)
+    
+    // Log FormData contents for debugging
+    console.log("FormData created with file:", file.name)
+    for (let [key, value] of formData.entries()) {
+      console.log("FormData entry:", key, value)
+    }
+
+    // Add timeout for mobile uploads
+    const controller = new AbortController()
+    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+    
+    const response = await fetch("/api/upload", {
+      method: "POST",
+      body: formData,
+      signal: controller.signal
+    })
+    
+    clearTimeout(timeoutId)
+
+    console.log("Upload response status:", response.status)
+    console.log("Upload response headers:", response.headers)
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      console.error("Upload failed with error data:", errorData)
+      throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
+    }
+
+    const uploadedPhoto: UploadedPhoto = await response.json()
+    console.log("Upload successful:", uploadedPhoto)
+    setUploadedPhotos((prev) => [...prev, uploadedPhoto])
   }
 
   const removePhoto = async (index: number) => {
