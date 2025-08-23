@@ -1,39 +1,34 @@
 import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Home, ArrowLeft } from 'lucide-react'
 
 export default function NotFound() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
-      <Card className="max-w-md w-full text-center">
-        <CardHeader>
-          <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
-            <span className="text-3xl font-bold text-red-600">404</span>
-          </div>
-          <CardTitle className="text-2xl font-bold text-gray-900">Page Not Found</CardTitle>
-          <CardDescription className="text-gray-600">
-            The page you're looking for doesn't exist or has been moved.
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <p className="text-sm text-gray-500">
-            This might be due to a broken link, incorrect URL, or the page has been removed.
-          </p>
-          <div className="flex flex-col gap-3">
-            <Button asChild className="w-full">
-              <Link href="/">
-                <Home className="h-4 w-4 mr-2" />
-                Go Home
-              </Link>
-            </Button>
-            <Button asChild variant="outline" className="w-full" onClick={() => window.history.back()}>
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Go Back
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+      <div className="max-w-md w-full bg-white rounded-lg shadow-lg p-8 text-center">
+        <div className="mx-auto w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <span className="text-3xl font-bold text-red-600">404</span>
+        </div>
+        <h1 className="text-2xl font-bold text-gray-900 mb-2">Page Not Found</h1>
+        <p className="text-gray-600 mb-6">
+          The page you're looking for doesn't exist or has been moved.
+        </p>
+        <p className="text-sm text-gray-500 mb-6">
+          This might be due to a broken link, incorrect URL, or the page has been removed.
+        </p>
+        <div className="space-y-3">
+          <Link 
+            href="/" 
+            className="block w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors"
+          >
+            Go Home
+          </Link>
+          <button 
+            onClick={() => window.history.back()}
+            className="block w-full bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300 transition-colors"
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
