@@ -1,14 +1,14 @@
-import { updateSession } from "@/lib/supabase/middleware"
-import type { NextRequest } from "next/server"
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  try {
-    return await updateSession(request)
-  } catch (error) {
-    console.error("Middleware execution failed:", error)
-    // If middleware fails, continue without authentication
-    return Response.next()
-  }
+export function middleware(request: NextRequest) {
+  // Simple middleware that just continues the request
+  // We'll handle authentication in the individual pages instead
+  
+  // Log the request for debugging
+  console.log('Middleware processing:', request.nextUrl.pathname)
+  
+  return NextResponse.next()
 }
 
 export const config = {
@@ -18,9 +18,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
      * - api routes (to avoid middleware conflicts)
-     * Feel free to modify this pattern to include more paths.
+     * - images - .svg, .png, .jpg, .jpeg, .gif, .webp
      */
     "/((?!_next/static|_next/image|favicon.ico|api|.*.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
