@@ -1,19 +1,58 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+'use client'
+
+import { useEffect, useState } from 'react'
+import { createClient } from "@/lib/supabase/client"
 import { InventoryForm } from "@/components/inventory-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlusCircle, Package, LogOut, Search } from "lucide-react"
 import Link from "next/link"
+import { useRouter } from 'next/navigation'
 
-export default async function DashboardPage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function DashboardPage() {
+  const [user, setUser] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const router = useRouter()
+  const supabase = createClient()
+
+  useEffect(() => {
+    async function getUser() {
+      try {
+        const { data: { user } } = await supabase.auth.getUser()
+        if (!user) {
+          router.push('/auth/login')
+          return
+        }
+        setUser(user)
+      } catch (error) {
+        console.error('Error getting user:', error)
+        router.push('/auth/login')
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    getUser()
+  }, [supabase.auth, router])
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    router.push('/')
+  }
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="mt-4 text-gray-600">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   if (!user) {
-    redirect("/auth/login")
+    return null
   }
 
   return (
@@ -28,12 +67,10 @@ export default async function DashboardPage() {
             </div>
             <div className="flex items-center gap-2 sm:gap-4">
               <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">Welcome, {user.email}</span>
-              <form action="/auth/signout" method="post">
-                <Button variant="ghost" size="sm" type="submit" className="h-8 px-2 sm:h-9 sm:px-3">
-                  <LogOut className="h-4 w-4 sm:mr-2" />
-                  <span className="hidden sm:inline">Sign Out</span>
-                </Button>
-              </form>
+              <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 px-2 sm:h-9 sm:px-3">
+                <LogOut className="h-4 w-4 sm:mr-2" />
+                <span className="hidden sm:inline">Sign Out</span>
+              </Button>
             </div>
           </div>
         </div>
@@ -103,47 +140,33 @@ export default async function DashboardPage() {
             <div className="space-y-6">
               <Card>
                 <CardHeader>
-                  <CardTitle>Quick Actions</CardTitle>
+                  <CardTitle className="text-lg">Welcome Back!</CardTitle>
+                  <CardDescription>Manage your art collection</CardDescription>
                 </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button asChild className="w-full">
-                    <Link href="/inventory">
-                      <Package className="h-4 w-4 mr-2" />
-                      View All Items
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full bg-transparent">
-                    <Link href="/inventory">
-                      <Search className="h-4 w-4 mr-2" />
-                      Search Inventory
-                    </Link>
-                  </Button>
+                <CardContent>
+                  <p className="text-sm text-gray-600">
+                    You're successfully logged in. Start adding your art pieces or browse your existing collection.
+                  </p>
                 </CardContent>
               </Card>
 
               <Card>
                 <CardHeader>
-                  <CardTitle>Collection Overview</CardTitle>
+                  <CardTitle className="text-lg">Quick Actions</CardTitle>
                 </CardHeader>
-                <CardContent>
-                  <div className="space-y-2 text-sm">
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Items:</span>
-                      <span className="font-medium">-</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Available:</span>
-                      <span className="font-medium text-green-600">-</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Sold:</span>
-                      <span className="font-medium text-blue-600">-</span>
-                    </div>
-                    <div className="flex justify-between">
-                      <span className="text-gray-600">Total Value:</span>
-                      <span className="font-medium">$-</span>
-                    </div>
-                  </div>
+                <CardContent className="space-y-3">
+                  <Button asChild className="w-full">
+                    <Link href="/inventory">
+                      <Package className="h-4 w-4 mr-2" />
+                      View Inventory
+                    </Link>
+                  </Button>
+                  <Button asChild variant="outline" className="w-full">
+                    <Link href="/inventory">
+                      <Search className="h-4 w-4 mr-2" />
+                      Search Items
+                    </Link>
+                  </Button>
                 </CardContent>
               </Card>
             </div>
