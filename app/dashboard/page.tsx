@@ -5,7 +5,7 @@ import { createClient } from "@/lib/supabase/client"
 import { InventoryForm } from "@/components/inventory-form"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle, Package, LogOut, Search } from "lucide-react"
+import { PlusCircle, Package, LogOut, Search, FolderOpen } from "lucide-react"
 import Link from "next/link"
 import { useRouter } from 'next/navigation'
 
@@ -93,6 +93,12 @@ export default function DashboardPage() {
                   </Link>
                 </Button>
                 <Button asChild variant="outline" className="w-full h-12 text-base bg-transparent">
+                  <Link href="/projects">
+                    <FolderOpen className="h-5 w-5 mr-3" />
+                    Manage Projects
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full h-12 text-base bg-transparent">
                   <Link href="/inventory">
                     <Search className="h-5 w-5 mr-3" />
                     Search Inventory
@@ -117,59 +123,93 @@ export default function DashboardPage() {
           </div>
 
           {/* Desktop layout */}
-          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-8">
-            {/* Add New Item Form */}
-            <div className="lg:col-span-2">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <PlusCircle className="h-5 w-5" />
-                    Add New Inventory Item
-                  </CardTitle>
-                  <CardDescription>
-                    Add a new art piece to your collection with photos, pricing, and location details.
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <InventoryForm />
-                </CardContent>
-              </Card>
-            </div>
+          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-6">
+            {/* Quick Actions */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Package className="h-5 w-5" />
+                  Inventory
+                </CardTitle>
+                <CardDescription>Manage your art collection</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button asChild className="w-full">
+                  <Link href="/inventory">
+                    <Package className="h-4 w-4 mr-2" />
+                    View All Items
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full bg-transparent">
+                  <Link href="/inventory">
+                    <Search className="h-4 w-4 mr-2" />
+                    Search & Filter
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
 
-            {/* Quick Stats */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Welcome Back!</CardTitle>
-                  <CardDescription>Manage your art collection</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <p className="text-sm text-gray-600">
-                    You're successfully logged in. Start adding your art pieces or browse your existing collection.
-                  </p>
-                </CardContent>
-              </Card>
+            {/* Projects Management */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <FolderOpen className="h-5 w-5" />
+                  Projects
+                </CardTitle>
+                <CardDescription>Organize by property or collection</CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <Button asChild className="w-full">
+                  <Link href="/projects">
+                    <FolderOpen className="h-4 w-4 mr-2" />
+                    Manage Projects
+                  </Link>
+                </Button>
+                <Button asChild variant="outline" className="w-full bg-transparent">
+                  <Link href="/projects">
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Create New Project
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
 
-              <Card>
-                <CardHeader>
-                  <CardTitle className="text-lg">Quick Actions</CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                  <Button asChild className="w-full">
-                    <Link href="/inventory">
-                      <Package className="h-4 w-4 mr-2" />
-                      View Inventory
-                    </Link>
-                  </Button>
-                  <Button asChild variant="outline" className="w-full">
-                    <Link href="/inventory">
-                      <Search className="h-4 w-4 mr-2" />
-                      Search Items
-                    </Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            </div>
+            {/* Add New Item */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <PlusCircle className="h-5 w-5" />
+                  Add Item
+                </CardTitle>
+                <CardDescription>Add new artwork to your inventory</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button asChild className="w-full">
+                  <Link href="#add-item">
+                    <PlusCircle className="h-4 w-4 mr-2" />
+                    Add New Item
+                  </Link>
+                </Button>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Add New Item Form Section */}
+          <div id="add-item" className="pt-8">
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-xl">
+                  <PlusCircle className="h-6 w-6" />
+                  Add New Inventory Item
+                </CardTitle>
+                <CardDescription>
+                  Add a new art piece to your collection with photos, pricing, and location details.
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <InventoryForm />
+              </CardContent>
+            </Card>
           </div>
         </div>
       </main>
