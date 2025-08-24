@@ -21,6 +21,26 @@ export function createApiClient() {
 }
 
 /**
+ * Create a service role client that bypasses RLS policies
+ * This is used for server-side operations where we need full access
+ */
+export function createServiceRoleClient() {
+  const supabaseUrl = process.env.NEXT_PUBLIC_INVAPPSUPABASE_URL
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY
+  
+  if (!supabaseUrl || !serviceRoleKey) {
+    throw new Error("Missing Supabase service role key")
+  }
+  
+  return createClient(supabaseUrl, serviceRoleKey, {
+    auth: {
+      autoRefreshToken: false,
+      persistSession: false
+    }
+  })
+}
+
+/**
  * Create an authenticated Supabase client using a user's access token
  */
 export function createAuthenticatedApiClient(accessToken: string) {
@@ -38,13 +58,8 @@ export function createAuthenticatedApiClient(accessToken: string) {
     }
   })
   
-  // Set the user's session
-  client.auth.setSession({
-    access_token: accessToken,
-    refresh_token: '',
-    expires_in: 3600,
-    token_type: 'bearer'
-  })
+  // Set the access token directly
+  client.auth.setAccessToken(accessToken)
   
   return client
 }

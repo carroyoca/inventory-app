@@ -1,4 +1,4 @@
-import { createAuthenticatedApiClient } from "@/lib/supabase/api-client"
+import { createServiceRoleClient } from "@/lib/supabase/api-client"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function OPTIONS() {
@@ -37,21 +37,22 @@ export async function DELETE(request: NextRequest) {
     const token = authHeader.replace('Bearer ', '')
     console.log("Token extracted, length:", token.length)
 
-    // Create authenticated Supabase client
+    // Create service role client (bypasses RLS)
     let supabase
     try {
-      supabase = createAuthenticatedApiClient(token)
-      console.log("✅ Authenticated Supabase client created successfully")
+      supabase = createServiceRoleClient()
+      console.log("✅ Service role Supabase client created successfully")
     } catch (clientError) {
-      console.error("❌ Failed to create authenticated Supabase client:", clientError)
+      console.error("❌ Failed to create service role client:", clientError)
       return NextResponse.json({ 
         error: "Database connection failed", 
         details: clientError instanceof Error ? clientError.message : "Unknown error"
       }, { status: 500 })
     }
 
-    // Verify the user's authentication
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    // Verify the user's authentication using the token
+    console.log("🔍 Verifying user authentication...")
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     console.log("Auth check result:", { user: !!user, error: authError })
     
     if (authError) {
