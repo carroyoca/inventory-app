@@ -7,6 +7,7 @@ import { MapPin, DollarSign, ExternalLink, Edit, Trash2 } from "lucide-react"
 import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
+import { createClient } from "@/lib/supabase/client"
 
 interface InventoryItem {
   id: string
@@ -47,6 +48,22 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       console.log("Attempting to delete item:", id)
       console.log("Current URL:", window.location.href)
       
+      // Get the user's session token
+      const supabase = createClient()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+      
+      if (sessionError) {
+        console.error("Session error:", sessionError)
+        throw new Error("Failed to get user session")
+      }
+      
+      if (!session?.access_token) {
+        console.error("No access token found")
+        throw new Error("User not authenticated")
+      }
+      
+      console.log("Session token obtained, length:", session.access_token.length)
+      
       const requestBody = { id }
       console.log("Request body:", requestBody)
       
@@ -54,7 +71,8 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
         method: "DELETE",
         headers: { 
           "Content-Type": "application/json",
-          "Accept": "application/json"
+          "Accept": "application/json",
+          "Authorization": `Bearer ${session.access_token}`
         },
         body: JSON.stringify(requestBody),
       })

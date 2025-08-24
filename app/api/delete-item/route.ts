@@ -1,4 +1,4 @@
-import { createClient } from "@/lib/supabase/server"
+import { createApiClient } from "@/lib/supabase/api-client"
 import { type NextRequest, NextResponse } from "next/server"
 
 export async function OPTIONS() {
@@ -24,16 +24,38 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "No ID provided" }, { status: 400 })
     }
 
-    const supabase = createClient()
-    console.log("Supabase client created")
+    // Get authorization header
+    const authHeader = request.headers.get('authorization')
+    console.log("Auth header present:", !!authHeader)
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      console.log("No valid authorization header")
+      return NextResponse.json({ error: "Authorization header required" }, { status: 401 })
+    }
 
-    // Check if user is authenticated
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const token = authHeader.replace('Bearer ', '')
+    console.log("Token extracted, length:", token.length)
+
+    // Create Supabase client with proper error handling
+    let supabase
+    try {
+      supabase = createApiClient()
+      console.log("Supabase API client created successfully")
+    } catch (clientError) {
+      console.error("Failed to create Supabase client:", clientError)
+      return NextResponse.json({ 
+        error: "Database connection failed", 
+        details: clientError instanceof Error ? clientError.message : "Unknown error"
+      }, { status: 500 })
+    }
+
+    // Set the user's session token
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     console.log("Auth check result:", { user: !!user, error: authError })
     
     if (authError) {
       console.error("Auth error:", authError)
-      return NextResponse.json({ error: "Authentication error" }, { status: 401 })
+      return NextResponse.json({ error: "Authentication error", details: authError.message }, { status: 401 })
     }
     
     if (!user) {
