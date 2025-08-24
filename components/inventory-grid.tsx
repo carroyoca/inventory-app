@@ -43,7 +43,12 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
     if (!confirm("Are you sure you want to delete this item?")) return
 
     try {
+      console.log("=== DELETE OPERATION START ===")
       console.log("Attempting to delete item:", id)
+      console.log("Current URL:", window.location.href)
+      
+      const requestBody = { id }
+      console.log("Request body:", requestBody)
       
       const response = await fetch("/api/delete-item", {
         method: "DELETE",
@@ -51,11 +56,12 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
           "Content-Type": "application/json",
           "Accept": "application/json"
         },
-        body: JSON.stringify({ id }),
+        body: JSON.stringify(requestBody),
       })
 
       console.log("Delete response status:", response.status)
       console.log("Delete response headers:", response.headers)
+      console.log("Delete response ok:", response.ok)
       
       if (!response.ok) {
         let errorMessage = `Delete failed with status: ${response.status}`
@@ -78,8 +84,13 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       }
 
       console.log("Item deleted successfully:", id)
+      console.log("=== DELETE OPERATION SUCCESS ===")
     } catch (error) {
+      console.error("=== DELETE OPERATION FAILED ===")
       console.error("Error deleting item:", error)
+      console.error("Error type:", typeof error)
+      console.error("Error message:", error instanceof Error ? error.message : "Unknown error")
+      console.error("Error stack:", error instanceof Error ? error.stack : "No stack")
       alert(`Error deleting item: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }

@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState } from "react"
+import { useState, useRef } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -61,6 +61,7 @@ export function InventoryForm() {
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([])
   const router = useRouter()
+  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -453,6 +454,7 @@ export function InventoryForm() {
             {/* Hidden Photo Upload Input */}
             <div className="hidden">
               <Input
+                ref={fileInputRef}
                 id="photos"
                 type="file"
                 multiple
@@ -468,11 +470,10 @@ export function InventoryForm() {
               type="button"
               variant="outline"
               onClick={() => {
-                const fileInput = document.getElementById("photos") as HTMLInputElement
-                if (fileInput) {
-                  fileInput.click()
+                if (fileInputRef.current) {
+                  fileInputRef.current.click()
                 } else {
-                  console.error("File input not found")
+                  console.error("File input ref not found")
                   alert("Error: File input not found. Please refresh the page.")
                 }
               }}
@@ -499,10 +500,9 @@ export function InventoryForm() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const input = document.getElementById("photos") as HTMLInputElement
-                  if (input) {
-                    input.removeAttribute("capture")
-                    input.click()
+                  if (fileInputRef.current) {
+                    fileInputRef.current.removeAttribute("capture")
+                    fileInputRef.current.click()
                   }
                 }}
                 className="flex-1"
@@ -513,10 +513,9 @@ export function InventoryForm() {
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  const input = document.getElementById("photos") as HTMLInputElement
-                  if (input) {
-                    input.setAttribute("capture", "environment")
-                    input.click()
+                  if (fileInputRef.current) {
+                    fileInputRef.current.setAttribute("capture", "environment")
+                    fileInputRef.current.click()
                   }
                 }}
                 className="flex-1"
