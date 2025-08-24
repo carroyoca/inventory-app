@@ -47,16 +47,26 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       
       const response = await fetch("/api/delete-item", {
         method: "DELETE",
-        headers: { "Content-Type": "application/json" },
+        headers: { 
+          "Content-Type": "application/json",
+          "Accept": "application/json"
+        },
         body: JSON.stringify({ id }),
       })
 
       console.log("Delete response status:", response.status)
+      console.log("Delete response headers:", response.headers)
       
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Delete response error:", errorData)
-        throw new Error(errorData.error || `Delete failed with status: ${response.status}`)
+        let errorMessage = `Delete failed with status: ${response.status}`
+        try {
+          const errorData = await response.json()
+          console.error("Delete response error data:", errorData)
+          errorMessage = errorData.error || errorData.details || errorMessage
+        } catch (parseError) {
+          console.error("Could not parse error response:", parseError)
+        }
+        throw new Error(errorMessage)
       }
 
       const result = await response.json()

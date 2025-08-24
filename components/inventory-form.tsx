@@ -450,11 +450,8 @@ export function InventoryForm() {
         <Label className="text-sm font-medium">Photos</Label>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-            {/* Photo Upload */}
-            <div className="space-y-2">
-              <Label htmlFor="photos" className="text-sm font-medium">
-                Photos
-              </Label>
+            {/* Hidden Photo Upload Input */}
+            <div className="hidden">
               <Input
                 id="photos"
                 type="file"
@@ -464,23 +461,36 @@ export function InventoryForm() {
                 className="h-11 sm:h-10"
                 disabled={isSubmitting}
               />
-              <p className="text-xs text-gray-500">
-                Upload photos of your art piece. Supported formats: JPG, PNG, GIF, WebP. Max size: 50MB per photo.
-              </p>
             </div>
+            
+            {/* Add Photos Button */}
             <Button
               type="button"
               variant="outline"
-              onClick={() => document.getElementById("photos")?.click()}
+              onClick={() => {
+                const fileInput = document.getElementById("photos") as HTMLInputElement
+                if (fileInput) {
+                  fileInput.click()
+                } else {
+                  console.error("File input not found")
+                  alert("Error: File input not found. Please refresh the page.")
+                }
+              }}
               className="h-11 sm:h-10 w-full sm:w-auto"
+              disabled={isSubmitting}
             >
               <Upload className="h-4 w-4 mr-2" />
               Add Photos
             </Button>
+            
             <span className="text-sm text-gray-500 text-center sm:text-left">
               {photos.length} photo{photos.length !== 1 ? "s" : ""} selected
             </span>
           </div>
+          
+          <p className="text-xs text-gray-500 text-center sm:text-left">
+            Click "Add Photos" to upload photos of your art piece. Supported formats: JPG, PNG, GIF, WebP. Max size: 50MB per photo.
+          </p>
 
           {/* Mobile Photo Picker */}
           <div className="sm:hidden">
