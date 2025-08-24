@@ -43,15 +43,24 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
     if (!confirm("Are you sure you want to delete this item?")) return
 
     try {
+      console.log("Attempting to delete item:", id)
+      
       const response = await fetch("/api/delete-item", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ id }),
       })
 
+      console.log("Delete response status:", response.status)
+      
       if (!response.ok) {
-        throw new Error("Failed to delete item")
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Delete response error:", errorData)
+        throw new Error(errorData.error || `Delete failed with status: ${response.status}`)
       }
+
+      const result = await response.json()
+      console.log("Delete successful:", result)
 
       // Call the callback to update the parent component
       if (onItemDeleted) {
@@ -61,15 +70,15 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       console.log("Item deleted successfully:", id)
     } catch (error) {
       console.error("Error deleting item:", error)
-      alert("Error deleting item. Please try again.")
+      alert(`Error deleting item: ${error instanceof Error ? error.message : "Unknown error"}`)
     }
   }
 
   const handleEdit = (item: InventoryItem) => {
     // Navigate to edit page with item data
-    // For now, we'll navigate to the inventory page with edit mode
+    // For now, we'll navigate to the dashboard with edit mode
     // You can implement a proper edit form later
-    router.push(`/inventory?edit=${item.id}`)
+    router.push(`/dashboard?edit=${item.id}`)
   }
 
   return (

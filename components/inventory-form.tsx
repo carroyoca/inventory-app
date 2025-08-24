@@ -99,7 +99,7 @@ export function InventoryForm() {
     // Add files to display immediately
     setPhotos((prev) => [...prev, ...files])
 
-    // Initialize uploading states
+    // Initialize uploading states for new files
     const newUploadingStates = new Array(files.length).fill(true)
     setUploadingPhotos((prev) => [...prev, ...newUploadingStates])
 
@@ -147,8 +147,12 @@ export function InventoryForm() {
       // Mark this photo as done uploading
       setUploadingPhotos((prev) => {
         const newStates = [...prev]
-        const photoIndex = photos.length - files.length + i
-        newStates[photoIndex] = false
+        // Calculate the correct index for this file
+        const currentPhotosLength = prev.length
+        const fileIndex = currentPhotosLength - files.length + i
+        if (fileIndex >= 0 && fileIndex < newStates.length) {
+          newStates[fileIndex] = false
+        }
         return newStates
       })
     }
@@ -202,26 +206,32 @@ export function InventoryForm() {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
     
-    const response = await fetch("/api/upload", {
-      method: "POST",
-      body: formData,
-      signal: controller.signal
-    })
-    
-    clearTimeout(timeoutId)
+    try {
+      console.log("Sending upload request to /api/upload")
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        body: formData,
+        signal: controller.signal
+      })
+      
+      clearTimeout(timeoutId)
 
-    console.log("Upload response status:", response.status)
-    console.log("Upload response headers:", response.headers)
+      console.log("Upload response status:", response.status)
+      console.log("Upload response headers:", response.headers)
 
-    if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}))
-      console.error("Upload failed with error data:", errorData)
-      throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Upload failed with error data:", errorData)
+        throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
+      }
+
+      const uploadedPhoto: UploadedPhoto = await response.json()
+      console.log("Upload successful:", uploadedPhoto)
+      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
+    } catch (error) {
+      console.error("Upload error in uploadFileStandard:", error)
+      throw error
     }
-
-    const uploadedPhoto: UploadedPhoto = await response.json()
-    console.log("Upload successful:", uploadedPhoto)
-    setUploadedPhotos((prev) => [...prev, uploadedPhoto])
   }
 
   const removePhoto = async (index: number) => {
@@ -248,10 +258,37 @@ export function InventoryForm() {
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
+    
+    // Form validation
+    const formData = new FormData(e.currentTarget)
+    const requiredFields = {
+      product_type: "Product Type",
+      house_zone: "House Zone", 
+      product_name: "Product Name",
+      description: "Description"
+    }
+    
+    const missingFields = []
+    for (const [field, label] of Object.entries(requiredFields)) {
+      if (!formData.get(field) || formData.get(field)?.toString().trim() === '') {
+        missingFields.push(label)
+      }
+    }
+    
+    if (missingFields.length > 0) {
+      alert(`Please fill in the following required fields:\n${missingFields.join('\n')}`)
+      return
+    }
+    
+    // Check if at least one photo is uploaded
+    if (uploadedPhotos.length === 0) {
+      alert("Please upload at least one photo before submitting.")
+      return
+    }
+    
     setIsSubmitting(true)
 
     try {
-      const formData = new FormData(e.currentTarget)
       const supabase = createClient()
 
       // Check if user is authenticated
@@ -300,13 +337,14 @@ export function InventoryForm() {
       setUploadedPhotos([])
       setUploadingPhotos([])
 
-      // Show success and refresh
+      // Show success message
       alert("Inventory item added successfully!")
-      router.refresh()
+      
+      // Redirect to inventory page
+      router.push("/inventory")
     } catch (error) {
-      console.error("Error adding inventory item:", error)
-      const errorMessage = error instanceof Error ? error.message : "Error adding item. Please try again."
-      alert(errorMessage)
+      console.error("Error adding item:", error)
+      alert(error instanceof Error ? error.message : "Failed to add inventory item")
     } finally {
       setIsSubmitting(false)
     }
