@@ -29,7 +29,7 @@ export async function GET(request: NextRequest) {
     try {
       const { data, error } = await resend.emails.send({
         from: 'Art Inventory <onboarding@resend.dev>',
-        to: ['test@example.com'],
+        to: ['carroyoca66@gmail.com'],
         subject: 'Test Email from Art Inventory',
         html: '<p>This is a test email to verify Resend configuration.</p>'
       })
