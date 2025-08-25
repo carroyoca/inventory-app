@@ -40,19 +40,31 @@ export async function sendInvitationEmail({
 
     console.log('📧 Preparing email with URL:', joinUrl)
     
-    const { data, error } = await resend.emails.send({
-      from: 'Art Inventory <onboarding@resend.dev>',
-      to: [to],
-      subject: `Invitación para unirse al proyecto ${projectName}`,
-      react: InvitationEmail({
-        projectName,
-        inviterName,
-        inviterEmail,
-        role,
-        acceptUrl: joinUrl,
-        rejectUrl: joinUrl, // Not used anymore but keeping for compatibility
-      }),
-    })
+            const { data, error } = await resend.emails.send({
+          from: 'Art Inventory <onboarding@resend.dev>',
+          to: [to],
+          subject: `Invitación para unirse al proyecto ${projectName}`,
+          html: `
+            <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+              <h2>¡Has sido invitado a un proyecto!</h2>
+              <p>Hola,</p>
+              <p><strong>${inviterName}</strong> (${inviterEmail}) te ha invitado a unirte al proyecto <strong>${projectName}</strong> en Art Inventory.</p>
+              <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>Proyecto:</strong> ${projectName}</p>
+                <p><strong>Rol asignado:</strong> ${role === 'owner' ? 'Propietario' : role === 'manager' ? 'Administrador' : role === 'member' ? 'Miembro' : 'Solo Lectura'}</p>
+                <p><strong>Invitado por:</strong> ${inviterName}</p>
+              </div>
+              <div style="text-align: center; margin: 30px 0;">
+                <a href="${joinUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  🚀 Unirse al Proyecto
+                </a>
+              </div>
+              <p style="font-size: 14px; color: #6b7280; text-align: center;">
+                Haz clic en "Unirse al Proyecto" para acceder inmediatamente. Esta invitación expira en 7 días.
+              </p>
+            </div>
+          `,
+        })
 
     if (error) {
       console.error('❌ Error sending invitation email:', error)
