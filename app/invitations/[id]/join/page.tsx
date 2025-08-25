@@ -23,11 +23,17 @@ export default function JoinProjectPage() {
         // Get current session
         const { data: { session } } = await supabase.auth.getSession()
         
+        console.log('🔍 Session check:', !!session)
+        console.log('🔍 User check:', !!session?.user)
+        
         if (!session?.user) {
+          console.log('❌ No authenticated user found')
           setStatus('login-required')
           setMessage('Debes iniciar sesión para unirte al proyecto. Si no tienes cuenta, puedes crear una nueva.')
           return
         }
+
+        console.log('✅ User authenticated:', session.user.id)
 
         // Get invitation details to verify email match
         const { data: invitationDetails } = await supabase
