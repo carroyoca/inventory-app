@@ -17,13 +17,16 @@ import {
   Plus, 
   ChevronDown, 
   LogOut,
-  User
+  User,
+  Menu,
+  X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 export function ProjectHeader() {
   const { activeProject, setActiveProject, refreshActiveProject, clearProjectState } = useProject()
   const [isLoading, setIsLoading] = useState(false)
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false)
   const router = useRouter()
   const supabase = createClient()
 
@@ -56,22 +59,22 @@ export function ProjectHeader() {
   }
 
   return (
-    <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50">
+    <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-4 md:px-6 py-4 sticky top-0 z-50">
       <div className="flex items-center justify-between max-w-7xl mx-auto">
         {/* Logo y Título */}
-        <div className="flex items-center space-x-4">
+        <div className="flex items-center space-x-2 md:space-x-4">
           <div className="flex items-center space-x-2">
             <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl">
-              <FolderOpen className="w-6 h-6 text-white" />
+              <FolderOpen className="w-5 h-5 md:w-6 md:h-6 text-white" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Inventory App</h1>
+            <h1 className="text-lg md:text-xl font-bold text-gray-900">Inventory App</h1>
           </div>
           
-          {/* Separador */}
-          <div className="w-px h-8 bg-gray-300"></div>
+          {/* Separador - Hidden on mobile */}
+          <div className="hidden md:block w-px h-8 bg-gray-300"></div>
           
-          {/* Proyecto Activo */}
-          <div className="flex items-center space-x-2">
+          {/* Proyecto Activo - Hidden on mobile, shown in mobile menu */}
+          <div className="hidden md:flex items-center space-x-2">
             <span className="text-sm text-gray-500">Proyecto:</span>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -82,47 +85,46 @@ export function ProjectHeader() {
                   <ChevronDown className="ml-2 w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-                                <DropdownMenuContent align="start" className="w-56">
-                    <div className="px-2 py-1.5 text-sm text-gray-500">
-                      Proyecto actual
-                    </div>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => router.push('/projects')}
-                      className="cursor-pointer"
-                    >
-                      <Settings className="mr-2 w-4 h-4" />
-                      Gestionar Proyectos
-                    </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={() => router.push('/projects')}
-                      className="cursor-pointer"
-                    >
-                      <Plus className="mr-2 w-4 h-4" />
-                      Crear Nuevo Proyecto
-                    </DropdownMenuItem>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem 
-                      onClick={() => router.push('/inventory')}
-                      className="cursor-pointer"
-                    >
-                      <FolderOpen className="mr-2 w-4 h-4" />
-                      Ver Inventario
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
+              <DropdownMenuContent align="start" className="w-56">
+                <div className="px-2 py-1.5 text-sm text-gray-500">
+                  Proyecto actual
+                </div>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => router.push('/projects')}
+                  className="cursor-pointer"
+                >
+                  <Settings className="mr-2 w-4 h-4" />
+                  Gestionar Proyectos
+                </DropdownMenuItem>
+                <DropdownMenuItem 
+                  onClick={() => router.push('/projects')}
+                  className="cursor-pointer"
+                >
+                  <Plus className="mr-2 w-4 h-4" />
+                  Crear Nuevo Proyecto
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem 
+                  onClick={() => router.push('/inventory')}
+                  className="cursor-pointer"
+                >
+                  <FolderOpen className="mr-2 w-4 h-4" />
+                  Ver Inventario
+                </DropdownMenuItem>
+              </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>
 
-        {/* Acciones del Usuario */}
-        <div className="flex items-center space-x-4">
-          {/* Usuario */}
+        {/* Desktop Navigation */}
+        <div className="hidden md:flex items-center space-x-4">
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button variant="ghost" className="h-auto p-2">
                 <User className="w-4 h-4 mr-2" />
                 <span className="text-sm font-medium">
-                  {activeProject.members?.[0]?.role || 'Usuario'}
+                  {(activeProject as any).members?.[0]?.role || 'Usuario'}
                 </span>
                 <ChevronDown className="ml-2 w-4 h-4" />
               </Button>
@@ -139,7 +141,79 @@ export function ProjectHeader() {
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
+
+        {/* Mobile Menu Button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          className="md:hidden p-2"
+          onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+        >
+          {isMobileMenuOpen ? <X className="w-5 h-5" /> : <Menu className="w-5 h-5" />}
+        </Button>
       </div>
+
+      {/* Mobile Menu */}
+      {isMobileMenuOpen && (
+        <div className="md:hidden absolute top-full left-0 right-0 bg-white/95 backdrop-blur-sm border-b border-gray-200/50 shadow-lg">
+          <div className="px-4 py-4 space-y-3">
+            {/* Current Project */}
+            <div className="pb-2 border-b border-gray-200">
+              <p className="text-xs text-gray-500 mb-1">Proyecto actual</p>
+              <p className="font-medium text-gray-900">{activeProject.name}</p>
+            </div>
+            
+            {/* Navigation Items */}
+            <button
+              onClick={() => {
+                router.push('/inventory')
+                setIsMobileMenuOpen(false)
+              }}
+              className="w-full flex items-center px-3 py-2 text-left rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <FolderOpen className="mr-3 w-4 h-4" />
+              Ver Inventario
+            </button>
+            
+            <button
+              onClick={() => {
+                router.push('/projects')
+                setIsMobileMenuOpen(false)
+              }}
+              className="w-full flex items-center px-3 py-2 text-left rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Settings className="mr-3 w-4 h-4" />
+              Gestionar Proyectos
+            </button>
+            
+            <button
+              onClick={() => {
+                router.push('/projects')
+                setIsMobileMenuOpen(false)
+              }}
+              className="w-full flex items-center px-3 py-2 text-left rounded-lg hover:bg-gray-50 transition-colors"
+            >
+              <Plus className="mr-3 w-4 h-4" />
+              Crear Nuevo Proyecto
+            </button>
+            
+            {/* User Actions */}
+            <div className="pt-2 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  handleSignOut()
+                  setIsMobileMenuOpen(false)
+                }}
+                disabled={isLoading}
+                className="w-full flex items-center px-3 py-2 text-left rounded-lg hover:bg-red-50 text-red-600 transition-colors disabled:opacity-50"
+              >
+                <LogOut className="mr-3 w-4 h-4" />
+                {isLoading ? 'Cerrando...' : 'Cerrar Sesión'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </header>
   )
 }

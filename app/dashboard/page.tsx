@@ -147,7 +147,7 @@ export default function DashboardPage() {
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-1">Miembros</p>
                   <div className="text-3xl font-bold text-gray-900">
-                    {activeProject.member_count || 1}
+                    {(activeProject as any).member_count || 1}
                   </div>
                 </div>
                 <div className="p-3 bg-blue-100 rounded-xl">

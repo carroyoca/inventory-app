@@ -1,6 +1,6 @@
 import { createServiceRoleClient } from "@/lib/supabase/api-client"
 import { type NextRequest, NextResponse } from "next/server"
-import type { CreateProjectData, ProjectsResponse } from "@/lib/types/projects"
+import type { CreateProjectData, ProjectsResponse, ProjectWithMembers } from "@/lib/types/projects"
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -21,7 +21,7 @@ export async function GET(request: NextRequest) {
     // Get authorization header
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: "Authorization header required" }, { status: 401 })
+      return NextResponse.json({ error: "Se requiere autenticación" }, { status: 401 })
     }
 
     const token = authHeader.replace('Bearer ', '')
@@ -35,7 +35,7 @@ export async function GET(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
       console.error("❌ Auth error:", authError)
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 })
+      return NextResponse.json({ error: "Falló la autenticación" }, { status: 401 })
     }
 
     console.log("✅ User authenticated:", user.id)
@@ -68,10 +68,16 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to match our types
-    const transformedProjects = projects?.map(member => ({
-      ...member.projects,
+    const transformedProjects: ProjectWithMembers[] = projects?.map((member: any) => ({
+      id: member.projects.id,
+      name: member.projects.name,
+      description: member.projects.description,
+      created_by: member.projects.created_by,
+      created_at: member.projects.created_at,
+      updated_at: member.projects.updated_at,
       members: [{
         id: member.project_id,
+        project_id: member.project_id,
         user_id: user.id,
         role: member.role,
         joined_at: member.joined_at
@@ -112,7 +118,7 @@ export async function POST(request: NextRequest) {
     // Get authorization header
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: "Authorization header required" }, { status: 401 })
+      return NextResponse.json({ error: "Se requiere autenticación" }, { status: 401 })
     }
 
     const token = authHeader.replace('Bearer ', '')
@@ -123,7 +129,7 @@ export async function POST(request: NextRequest) {
     console.log("Request body:", body)
 
     if (!body.name || body.name.trim() === '') {
-      return NextResponse.json({ error: "Project name is required" }, { status: 400 })
+      return NextResponse.json({ error: "Se requiere el nombre del proyecto" }, { status: 400 })
     }
 
     // Create service role client
@@ -134,7 +140,7 @@ export async function POST(request: NextRequest) {
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
       console.error("❌ Auth error:", authError)
-      return NextResponse.json({ error: "Authentication failed" }, { status: 401 })
+      return NextResponse.json({ error: "Falló la autenticación" }, { status: 401 })
     }
 
     console.log("✅ User authenticated:", user.id)

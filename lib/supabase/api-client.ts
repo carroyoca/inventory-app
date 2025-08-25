@@ -55,11 +55,13 @@ export function createAuthenticatedApiClient(accessToken: string) {
     auth: {
       autoRefreshToken: false,
       persistSession: false
+    },
+    global: {
+      headers: {
+        Authorization: `Bearer ${accessToken}`
+      }
     }
   })
-  
-  // Set the access token directly
-  client.auth.setAccessToken(accessToken)
   
   return client
 }

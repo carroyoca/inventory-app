@@ -67,11 +67,11 @@ export async function DELETE(request: NextRequest) {
 
     console.log("✅ User authenticated:", user.id)
 
-    // First, let's check if the item exists and belongs to the user
-    console.log("🔍 Checking if item exists and belongs to user...")
+    // First, let's check if the item exists and user has access via project membership
+    console.log("🔍 Checking if item exists and user has project access...")
     const { data: existingItem, error: checkError } = await supabase
       .from("inventory_items")
-      .select("id, created_by")
+      .select("id, project_id")
       .eq("id", id)
       .single()
 
@@ -85,9 +85,18 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: "Item not found" }, { status: 404 })
     }
 
-    if (existingItem.created_by !== user.id) {
-      console.log("❌ Item does not belong to user. Item created_by:", existingItem.created_by, "User ID:", user.id)
-      return NextResponse.json({ error: "Unauthorized to delete this item" }, { status: 403 })
+    // Check if user is a member of the project (with permission to delete)
+    const { data: membership, error: membershipError } = await supabase
+      .from("project_members")
+      .select("role")
+      .eq("project_id", existingItem.project_id)
+      .eq("user_id", user.id)
+      .in("role", ["owner", "manager", "member"])
+      .single()
+
+    if (membershipError || !membership) {
+      console.log("❌ User does not have access to this project. Project ID:", existingItem.project_id, "User ID:", user.id)
+      return NextResponse.json({ error: "You do not have permission to delete items in this project" }, { status: 403 })
     }
 
     console.log("✅ Item verified, proceeding with deletion...")
@@ -98,7 +107,7 @@ export async function DELETE(request: NextRequest) {
       .from("inventory_items")
       .delete()
       .eq("id", id)
-      .eq("created_by", user.id) // Double-check user ownership
+      .eq("project_id", existingItem.project_id) // Double-check project ownership
       .select() // Return the deleted item to confirm
 
     if (deleteError) {

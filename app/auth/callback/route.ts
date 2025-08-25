@@ -13,7 +13,7 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth/auth-code-error`)
     }
 
-    const cookieStore = cookies()
+    const cookieStore = await cookies()
     const supabase = createServerClient(
       process.env.NEXT_PUBLIC_INVAPPSUPABASE_URL!,
       process.env.NEXT_PUBLIC_INVAPPSUPABASE_ANON_KEY!,

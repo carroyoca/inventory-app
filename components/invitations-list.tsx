@@ -232,7 +232,7 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
             }
           </p>
           <Button 
-            onClick={() => setIsRefreshing(true) || fetchInvitations()}
+            onClick={() => { setIsRefreshing(true); fetchInvitations(); }}
             variant="outline"
             disabled={isRefreshing}
           >
@@ -253,7 +253,7 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
       <div className="flex items-center justify-between">
         <h3 className="text-lg font-semibold">Invitaciones</h3>
         <Button 
-          onClick={() => setIsRefreshing(true) || fetchInvitations()}
+          onClick={() => { setIsRefreshing(true); fetchInvitations(); }}
           variant="outline"
           size="sm"
           disabled={isRefreshing}

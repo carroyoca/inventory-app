@@ -166,14 +166,9 @@ export default function JoinProjectPage() {
             )}
             
             {status === 'error' && (
-              <>
-                <Button onClick={() => router.push('/dashboard')}>
-                  Ir al Dashboard
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/projects')}>
-                  Ver Proyectos
-                </Button>
-              </>
+              <Button onClick={() => router.push('/auth/login')}>
+                Ir a Iniciar Sesión
+              </Button>
             )}
           </div>
         </CardContent>

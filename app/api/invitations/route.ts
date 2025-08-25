@@ -289,7 +289,7 @@ export async function POST(request: NextRequest) {
             
             console.log('📧 Email service result:', emailResult)
             
-            if (emailResult?.success === false) {
+            if (emailResult && 'success' in emailResult && emailResult.success === false) {
               console.log('❌ Email not sent:', emailResult.reason)
             } else {
               console.log('✅ Email sent successfully:', emailResult)
@@ -301,7 +301,9 @@ export async function POST(request: NextRequest) {
           }
         } catch (emailError) {
           console.error('❌ Error sending invitation email:', emailError)
-          console.error('❌ Email error stack:', emailError.stack)
+          if (emailError instanceof Error) {
+            console.error('❌ Email error stack:', emailError.stack)
+          }
           // Don't fail the request if email fails, but log the error
         }
         console.log('📧 === EMAIL SENDING END ===')

@@ -40,7 +40,7 @@ export default function ProjectUsersPage() {
         return
       }
 
-      const response = await fetch(`/api/projects/${activeProject.id}/members`, {
+      const response = await fetch(`/api/projects/${activeProject!.id}/members`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -68,7 +68,7 @@ export default function ProjectUsersPage() {
         return
       }
 
-      const response = await fetch(`/api/projects/${activeProject.id}/members/me`, {
+      const response = await fetch(`/api/projects/${activeProject!.id}/members/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

@@ -150,11 +150,12 @@ export async function PATCH(
     console.log('🔍 Invitation invitee_email:', invitation.invitee_email)
     console.log('🔍 Emails match:', userProfile?.email === invitation.invitee_email)
 
-    // For testing purposes, allow the invitation creator to accept their own invitation
-    if (userProfile?.email !== invitation.invitee_email && user.id !== invitation.inviter_id) {
+    // Strict email verification - user must have matching email
+    if (userProfile?.email !== invitation.invitee_email) {
       console.log('❌ Email mismatch - user cannot accept this invitation')
+      console.log('❌ Expected:', invitation.invitee_email, 'Got:', userProfile?.email)
       return NextResponse.json(
-        { error: 'You can only respond to invitations sent to your email' },
+        { error: 'You can only respond to invitations sent to your email address' },
         { status: 403 }
       )
     }

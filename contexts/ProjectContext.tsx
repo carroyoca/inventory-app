@@ -66,16 +66,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       if (projects && projects.length > 0) {
         const projectData = projects[0]
-        const project: Project = {
+        const project = {
           ...projectData.projects,
           members: [{
             id: projectData.project_id,
+            project_id: projectData.project_id,
             user_id: session.user.id,
             role: projectData.role,
             joined_at: projectData.joined_at
           }],
           member_count: 1
-        }
+        } as any
         console.log('🔄 ProjectContext: Setting active project:', project.name)
         setActiveProject(project)
       } else {
@@ -136,16 +137,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       }
 
       if (projects) {
-        const project: Project = {
+        const project = {
           ...projects.projects,
           members: [{
             id: projects.project_id,
+            project_id: projects.project_id,
             user_id: session.user.id,
             role: projects.role,
             joined_at: projects.joined_at
           }],
           member_count: 1
-        }
+        } as any
         console.log('🔄 ProjectContext: Switching to project:', project.name)
         setActiveProject(project)
       }
