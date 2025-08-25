@@ -80,26 +80,34 @@ export function ProjectHeader() {
                   <ChevronDown className="ml-2 w-4 h-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="w-56">
-                <div className="px-2 py-1.5 text-sm text-gray-500">
-                  Proyecto actual
-                </div>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem 
-                  onClick={() => router.push('/projects')}
-                  className="cursor-pointer"
-                >
-                  <Settings className="mr-2 w-4 h-4" />
-                  Gestionar Proyectos
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={() => router.push('/projects')}
-                  className="cursor-pointer"
-                >
-                  <Plus className="mr-2 w-4 h-4" />
-                  Crear Nuevo Proyecto
-                </DropdownMenuItem>
-              </DropdownMenuContent>
+                                <DropdownMenuContent align="start" className="w-56">
+                    <div className="px-2 py-1.5 text-sm text-gray-500">
+                      Proyecto actual
+                    </div>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => router.push('/projects')}
+                      className="cursor-pointer"
+                    >
+                      <Settings className="mr-2 w-4 h-4" />
+                      Gestionar Proyectos
+                    </DropdownMenuItem>
+                    <DropdownMenuItem 
+                      onClick={() => router.push('/projects')}
+                      className="cursor-pointer"
+                    >
+                      <Plus className="mr-2 w-4 h-4" />
+                      Crear Nuevo Proyecto
+                    </DropdownMenuItem>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem 
+                      onClick={() => router.push('/inventory')}
+                      className="cursor-pointer"
+                    >
+                      <FolderOpen className="mr-2 w-4 h-4" />
+                      Ver Inventario
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
             </DropdownMenu>
           </div>
         </div>

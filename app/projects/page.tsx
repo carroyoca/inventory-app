@@ -3,21 +3,28 @@
 import { useState } from "react"
 import { ProjectsList } from "@/components/projects-list"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Plus } from "lucide-react"
+import { ArrowLeft, Plus, Check } from "lucide-react"
 import { useRouter } from "next/navigation"
+import { useProject } from "@/contexts/ProjectContext"
 import type { ProjectWithMembers } from "@/lib/types/projects"
 
 export default function ProjectsPage() {
   const [selectedProject, setSelectedProject] = useState<ProjectWithMembers | null>(null)
   const router = useRouter()
+  const { activeProject, switchToProject } = useProject()
 
   const handleProjectSelect = (project: ProjectWithMembers) => {
     setSelectedProject(project)
-    // For now, just log the selection. Later we'll navigate to the project dashboard
-    console.log("Selected project:", project)
-    
-    // TODO: Navigate to project dashboard or show project details
-    // router.push(`/projects/${project.id}`)
+  }
+
+  const handleSwitchToProject = async (project: ProjectWithMembers) => {
+    try {
+      await switchToProject(project.id)
+      router.push('/dashboard')
+    } catch (error) {
+      console.error('Error switching to project:', error)
+      alert('Error switching to project. Please try again.')
+    }
   }
 
   const handleBackToProjects = () => {
@@ -86,12 +93,34 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            {/* Project Content Placeholder */}
+            {/* Project Actions */}
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="text-center text-gray-500 py-12">
-                <h3 className="text-lg font-medium mb-2">Project Dashboard</h3>
-                <p>This is where the project-specific content will go.</p>
-                <p className="text-sm mt-2">Coming in future sprints: Estancias, Inventory, Members, etc.</p>
+              <div className="flex items-center justify-between">
+                <div>
+                  <h3 className="text-lg font-medium text-gray-900">Project Actions</h3>
+                  <p className="text-gray-600 mt-1">Manage this project and its inventory</p>
+                </div>
+                <div className="flex gap-3">
+                  {activeProject?.id === selectedProject.id ? (
+                    <Button disabled className="flex items-center gap-2">
+                      <Check className="h-4 w-4" />
+                      Current Project
+                    </Button>
+                  ) : (
+                    <Button 
+                      onClick={() => handleSwitchToProject(selectedProject)}
+                      className="flex items-center gap-2"
+                    >
+                      Switch to This Project
+                    </Button>
+                  )}
+                  <Button 
+                    variant="outline"
+                    onClick={() => router.push('/dashboard')}
+                  >
+                    Go to Dashboard
+                  </Button>
+                </div>
               </div>
             </div>
           </div>

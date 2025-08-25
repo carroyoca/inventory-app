@@ -10,6 +10,7 @@ interface ProjectContextType {
   isLoading: boolean
   refreshActiveProject: () => Promise<void>
   clearProjectState: () => void
+  switchToProject: (projectId: string) => Promise<void>
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -97,6 +98,65 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     await getActiveProject()
   }
 
+  // Función para cambiar a un proyecto específico
+  const switchToProject = async (projectId: string) => {
+    console.log('🔄 ProjectContext: switchToProject called with projectId:', projectId)
+    try {
+      setIsLoading(true)
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.user) {
+        throw new Error("No authenticated user")
+      }
+
+      // Obtener el proyecto específico
+      const { data: projects, error } = await supabase
+        .from('project_members')
+        .select(`
+          project_id,
+          role,
+          joined_at,
+          projects (
+            id,
+            name,
+            description,
+            created_by,
+            created_at,
+            updated_at
+          )
+        `)
+        .eq('user_id', session.user.id)
+        .eq('project_id', projectId)
+        .single()
+
+      if (error) {
+        console.error('Error switching to project:', error)
+        throw error
+      }
+
+      if (projects) {
+        const project: Project = {
+          ...projects.projects,
+          members: [{
+            id: projects.project_id,
+            user_id: session.user.id,
+            role: projects.role,
+            joined_at: projects.joined_at
+          }],
+          member_count: 1
+        }
+        console.log('🔄 ProjectContext: Switching to project:', project.name)
+        setActiveProject(project)
+      }
+    } catch (error) {
+      console.error('Error in switchToProject:', error)
+      throw error
+    } finally {
+      setIsLoading(false)
+    }
+  }
+
   // Función para limpiar el estado (útil para logout)
   const clearProjectState = () => {
     console.log('🔄 ProjectContext: clearProjectState called')
@@ -139,7 +199,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     setActiveProject,
     isLoading,
     refreshActiveProject,
-    clearProjectState
+    clearProjectState,
+    switchToProject
   }
 
   return (

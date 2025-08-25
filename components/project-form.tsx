@@ -8,6 +8,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { PlusCircle, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
+import { useProject } from "@/contexts/ProjectContext"
 import type { CreateProjectData } from "@/lib/types/projects"
 
 interface ProjectFormProps {
@@ -19,6 +20,7 @@ export function ProjectForm({ onProjectCreated }: ProjectFormProps) {
   const [name, setName] = useState("")
   const [description, setDescription] = useState("")
   const [error, setError] = useState<string | null>(null)
+  const { refreshActiveProject } = useProject()
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -64,6 +66,9 @@ export function ProjectForm({ onProjectCreated }: ProjectFormProps) {
       // Reset form
       setName("")
       setDescription("")
+      
+      // Refresh the active project context
+      await refreshActiveProject()
       
       // Notify parent component
       onProjectCreated()
