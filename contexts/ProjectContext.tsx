@@ -114,6 +114,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       console.log('🔄 ProjectContext: Session validated, fetching project data...')
 
       // Obtener el proyecto específico
+      console.log('🔄 ProjectContext: Querying with user_id:', session.user.id, 'project_id:', projectId)
       const { data: projects, error } = await supabase
         .from('project_members')
         .select(`
@@ -137,7 +138,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       if (error) {
         console.error('❌ ProjectContext: Database error:', error)
-        throw new Error(`Failed to access project: ${error.message}`)
+        console.error('❌ ProjectContext: Error details:', JSON.stringify(error, null, 2))
+        
+        // If it's an RLS error, try to provide more helpful information
+        if (error.message?.includes('row-level security') || error.code === 'PGRST116') {
+          throw new Error(`Access denied: You don't have permission to access this project. This might be due to security policies.`)
+        } else {
+          throw new Error(`Failed to access project: ${error.message || 'Unknown database error'}`)
+        }
       }
 
       if (!projects) {
