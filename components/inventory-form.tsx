@@ -2,7 +2,7 @@
 
 import type React from "react"
 
-import { useState, useRef } from "react"
+import { useState, useRef, useEffect } from "react"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -56,7 +56,30 @@ interface UploadedPhoto {
   type: string
 }
 
-export function InventoryForm() {
+interface InventoryItem {
+  id: string
+  product_type: string
+  house_zone: string
+  product_name: string
+  product_id: string | null
+  description: string
+  notes: string | null
+  estimated_price: number | null
+  sale_price: number | null
+  status: string
+  listing_link: string | null
+  photos: string[]
+  created_at: string
+  project_id: string
+}
+
+interface InventoryFormProps {
+  mode?: 'create' | 'edit'
+  initialData?: InventoryItem
+  onSuccess?: () => void
+}
+
+export function InventoryForm({ mode = 'create', initialData, onSuccess }: InventoryFormProps) {
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
@@ -64,6 +87,20 @@ export function InventoryForm() {
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { activeProject } = useProject()
+
+  // Initialize form with existing data in edit mode
+  useEffect(() => {
+    if (mode === 'edit' && initialData) {
+      // Convert existing photo URLs to UploadedPhoto format
+      const existingPhotos: UploadedPhoto[] = initialData.photos.map((url, index) => ({
+        url,
+        filename: `existing-photo-${index}.jpg`,
+        size: 0,
+        type: 'image/jpeg'
+      }))
+      setUploadedPhotos(existingPhotos)
+    }
+  }, [mode, initialData])
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -308,8 +345,7 @@ export function InventoryForm() {
       // Use uploaded photo URLs
       const photoUrls = uploadedPhotos.map((photo) => photo.url)
 
-      // Insert inventory item
-      const { error } = await supabase.from("inventory_items").insert({
+      const itemData = {
         product_type: formData.get("product_type"),
         house_zone: formData.get("house_zone"),
         product_name: formData.get("product_name"),
@@ -321,9 +357,30 @@ export function InventoryForm() {
         status: formData.get("status"),
         listing_link: formData.get("listing_link"),
         photos: photoUrls,
-        created_by: user.id,
         project_id: activeProject.id,
-      })
+      }
+
+      let error
+      if (mode === 'edit' && initialData) {
+        // Update existing item
+        const { error: updateError } = await supabase
+          .from("inventory_items")
+          .update(itemData)
+          .eq('id', initialData.id)
+          .eq('project_id', activeProject.id)
+        
+        error = updateError
+      } else {
+        // Insert new item
+        const { error: insertError } = await supabase
+          .from("inventory_items")
+          .insert({
+            ...itemData,
+            created_by: user.id,
+          })
+        
+        error = insertError
+      }
 
       if (error) {
         console.error("Database error:", error)
@@ -347,10 +404,18 @@ export function InventoryForm() {
       setUploadingPhotos([])
 
       // Show success message
-      alert("Inventory item added successfully!")
+      const successMessage = mode === 'edit' 
+        ? "Inventory item updated successfully!" 
+        : "Inventory item added successfully!"
+      alert(successMessage)
       
-      // Redirect to dashboard (project-specific)
-      router.push("/dashboard")
+      // Call onSuccess callback or redirect
+      if (onSuccess) {
+        onSuccess()
+      } else {
+        // Default redirect to dashboard (project-specific)
+        router.push("/dashboard")
+      }
     } catch (error) {
       console.error("Error adding item:", error)
       alert(error instanceof Error ? error.message : "Failed to add inventory item")
@@ -367,7 +432,7 @@ export function InventoryForm() {
           <Label htmlFor="product_type" className="text-sm font-medium">
             Product Type *
           </Label>
-          <Select name="product_type" required>
+          <Select name="product_type" defaultValue={initialData?.product_type} required>
             <SelectTrigger className="h-11 sm:h-10">
               <SelectValue placeholder="Select product type" />
             </SelectTrigger>
@@ -386,7 +451,7 @@ export function InventoryForm() {
           <Label htmlFor="house_zone" className="text-sm font-medium">
             House Zone *
           </Label>
-          <Select name="house_zone" required>
+          <Select name="house_zone" defaultValue={initialData?.house_zone} required>
             <SelectTrigger className="h-11 sm:h-10">
               <SelectValue placeholder="Select location" />
             </SelectTrigger>
@@ -411,6 +476,7 @@ export function InventoryForm() {
             id="product_name"
             name="product_name"
             placeholder="e.g., Abstract Oil Painting"
+            defaultValue={initialData?.product_name}
             required
             className="h-11 sm:h-10"
           />
@@ -421,7 +487,13 @@ export function InventoryForm() {
           <Label htmlFor="product_id" className="text-sm font-medium">
             Product ID / Serial Number
           </Label>
-          <Input id="product_id" name="product_id" placeholder="e.g., AOP-001" className="h-11 sm:h-10" />
+          <Input 
+            id="product_id" 
+            name="product_id" 
+            placeholder="e.g., AOP-001" 
+            defaultValue={initialData?.product_id || ''} 
+            className="h-11 sm:h-10" 
+          />
         </div>
       </div>
 
@@ -434,6 +506,7 @@ export function InventoryForm() {
           id="description"
           name="description"
           placeholder="Detailed description of the art piece..."
+          defaultValue={initialData?.description}
           rows={3}
           required
           className="resize-none"
@@ -449,6 +522,7 @@ export function InventoryForm() {
           id="notes"
           name="notes"
           placeholder="Additional notes, condition, history..."
+          defaultValue={initialData?.notes || ''}
           rows={2}
           className="resize-none"
         />
@@ -592,6 +666,7 @@ export function InventoryForm() {
             type="number"
             step="0.01"
             placeholder="0.00"
+            defaultValue={initialData?.estimated_price?.toString() || ''}
             className="h-11 sm:h-10"
           />
         </div>
@@ -607,6 +682,7 @@ export function InventoryForm() {
             type="number"
             step="0.01"
             placeholder="0.00"
+            defaultValue={initialData?.sale_price?.toString() || ''}
             className="h-11 sm:h-10"
           />
         </div>
@@ -618,7 +694,7 @@ export function InventoryForm() {
           <Label htmlFor="status" className="text-sm font-medium">
             Status *
           </Label>
-          <Select name="status" defaultValue="available" required>
+          <Select name="status" defaultValue={initialData?.status || "available"} required>
             <SelectTrigger className="h-11 sm:h-10">
               <SelectValue />
             </SelectTrigger>
@@ -637,7 +713,14 @@ export function InventoryForm() {
           <Label htmlFor="listing_link" className="text-sm font-medium">
             Listing Link
           </Label>
-          <Input id="listing_link" name="listing_link" type="url" placeholder="https://..." className="h-11 sm:h-10" />
+          <Input 
+            id="listing_link" 
+            name="listing_link" 
+            type="url" 
+            placeholder="https://..." 
+            defaultValue={initialData?.listing_link || ''} 
+            className="h-11 sm:h-10" 
+          />
         </div>
       </div>
 
@@ -650,12 +733,12 @@ export function InventoryForm() {
           {isSubmitting ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              Adding...
+              {mode === 'edit' ? 'Updating...' : 'Adding...'}
             </>
           ) : (
             <>
               <Plus className="h-4 w-4 mr-2" />
-              Add Item
+              {mode === 'edit' ? 'Update Item' : 'Add Item'}
             </>
           )}
         </Button>

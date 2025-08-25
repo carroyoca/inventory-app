@@ -114,10 +114,8 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
   }
 
   const handleEdit = (item: InventoryItem) => {
-    // Navigate to edit page with item data
-    // For now, we'll navigate to the dashboard with edit mode
-    // You can implement a proper edit form later
-    router.push(`/dashboard?edit=${item.id}`)
+    // Navigate to the dedicated edit page
+    router.push(`/inventory/edit/${item.id}`)
   }
 
   return (
