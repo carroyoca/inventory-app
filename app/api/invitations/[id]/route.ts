@@ -144,12 +144,21 @@ export async function PATCH(
       .eq('id', user.id)
       .single()
 
+    console.log('🔍 === ACCEPT INVITATION DEBUG ===')
+    console.log('🔍 User ID:', user.id)
+    console.log('🔍 User profile email:', userProfile?.email)
+    console.log('🔍 Invitation invitee_email:', invitation.invitee_email)
+    console.log('🔍 Emails match:', userProfile?.email === invitation.invitee_email)
+
     if (userProfile?.email !== invitation.invitee_email) {
+      console.log('❌ Email mismatch - user cannot accept this invitation')
       return NextResponse.json(
         { error: 'You can only respond to invitations sent to your email' },
         { status: 403 }
       )
     }
+    
+    console.log('✅ Email verification passed')
 
     // Update invitation status
     const updateData: any = {

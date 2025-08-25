@@ -251,46 +251,60 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Send email notification
-    try {
-      const { data: project } = await supabase
-        .from('projects')
-        .select('name')
-        .eq('id', project_id)
-        .single()
+            // Send email notification
+        try {
+          console.log('📧 === EMAIL SENDING START ===')
+          console.log('📧 Invitation ID:', invitation.id)
+          console.log('📧 To:', invitee_email)
+          console.log('📧 Role:', role)
+          
+          const { data: project } = await supabase
+            .from('projects')
+            .select('name')
+            .eq('id', project_id)
+            .single()
 
-      const { data: inviterProfile } = await supabase
-        .from('profiles')
-        .select('full_name, email')
-        .eq('id', user.id)
-        .single()
+          const { data: inviterProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', user.id)
+            .single()
 
-      if (project && inviterProfile) {
-        console.log('📧 Attempting to send invitation email to:', invitee_email)
-        console.log('📧 Project:', project.name)
-        console.log('📧 Inviter:', inviterProfile.full_name || inviterProfile.email)
-        
-        const emailResult = await sendInvitationEmail({
-          to: invitee_email,
-          projectName: project.name,
-          inviterName: inviterProfile.full_name || inviterProfile.email,
-          inviterEmail: inviterProfile.email,
-          role,
-          invitationId: invitation.id,
-        })
-        
-        if (emailResult?.success === false) {
-          console.log('❌ Email not sent:', emailResult.reason)
-        } else {
-          console.log('✅ Email sent successfully:', emailResult)
+          console.log('📧 Project data:', project)
+          console.log('📧 Inviter profile:', inviterProfile)
+
+          if (project && inviterProfile) {
+            console.log('📧 Attempting to send invitation email to:', invitee_email)
+            console.log('📧 Project:', project.name)
+            console.log('📧 Inviter:', inviterProfile.full_name || inviterProfile.email)
+            
+            const emailResult = await sendInvitationEmail({
+              to: invitee_email,
+              projectName: project.name,
+              inviterName: inviterProfile.full_name || inviterProfile.email,
+              inviterEmail: inviterProfile.email,
+              role,
+              invitationId: invitation.id,
+            })
+            
+            console.log('📧 Email service result:', emailResult)
+            
+            if (emailResult?.success === false) {
+              console.log('❌ Email not sent:', emailResult.reason)
+            } else {
+              console.log('✅ Email sent successfully:', emailResult)
+            }
+          } else {
+            console.log('❌ Missing project or inviter profile for email')
+            console.log('❌ Project found:', !!project)
+            console.log('❌ Profile found:', !!inviterProfile)
+          }
+        } catch (emailError) {
+          console.error('❌ Error sending invitation email:', emailError)
+          console.error('❌ Email error stack:', emailError.stack)
+          // Don't fail the request if email fails, but log the error
         }
-      } else {
-        console.log('❌ Missing project or inviter profile for email')
-      }
-    } catch (emailError) {
-      console.error('Error sending invitation email:', emailError)
-      // Don't fail the request if email fails, but log the error
-    }
+        console.log('📧 === EMAIL SENDING END ===')
 
             console.log('✅ Invitation created successfully:', invitation.id)
         
