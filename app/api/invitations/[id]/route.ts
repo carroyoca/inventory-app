@@ -190,18 +190,40 @@ export async function PATCH(
 
     // If accepted, add user to project members
     if (status === 'accepted') {
-      const { error: memberError } = await supabase
+      console.log('🔍 === ADDING USER TO PROJECT MEMBERS ===')
+      console.log('🔍 Project ID:', invitation.project_id)
+      console.log('🔍 User ID:', user.id)
+      console.log('🔍 Role:', invitation.role)
+      
+      // Check if user is already a member
+      const { data: existingMember } = await supabase
         .from('project_members')
-        .insert({
-          project_id: invitation.project_id,
-          user_id: user.id,
-          role: invitation.role,
-          joined_at: new Date().toISOString()
-        })
+        .select('id')
+        .eq('project_id', invitation.project_id)
+        .eq('user_id', user.id)
+        .single()
+      
+      if (existingMember) {
+        console.log('⚠️ User is already a member of this project')
+      } else {
+        console.log('✅ Adding user as new member')
+        const { data: newMember, error: memberError } = await supabase
+          .from('project_members')
+          .insert({
+            project_id: invitation.project_id,
+            user_id: user.id,
+            role: invitation.role,
+            joined_at: new Date().toISOString()
+          })
+          .select()
+          .single()
 
-      if (memberError) {
-        console.error('Error adding user to project members:', memberError)
-        // Don't fail the request, but log the error
+        if (memberError) {
+          console.error('❌ Error adding user to project members:', memberError)
+          // Don't fail the request, but log the error
+        } else {
+          console.log('✅ User successfully added to project members:', newMember)
+        }
       }
     }
 

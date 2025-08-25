@@ -25,9 +25,19 @@ export default function JoinProjectPage() {
         
         if (!session?.user) {
           setStatus('login-required')
-          setMessage('Debes iniciar sesión para unirte al proyecto')
+          setMessage('Debes iniciar sesión para unirte al proyecto. Si no tienes cuenta, puedes crear una nueva.')
           return
         }
+
+        // Verify that the user's email matches the invitation
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('email')
+          .eq('id', session.user.id)
+          .single()
+
+        console.log('🔍 User email:', userProfile?.email)
+        console.log('🔍 Invitation ID:', invitationId)
 
         // Accept the invitation automatically
         const response = await fetch(`/api/invitations/${invitationId}`, {
@@ -118,7 +128,7 @@ export default function JoinProjectPage() {
                 <Button onClick={() => router.push('/auth/login')}>
                   Iniciar Sesión
                 </Button>
-                <Button variant="outline" onClick={() => router.push('/auth/sign-up')}>
+                <Button variant="outline" onClick={() => router.push('/auth/sign-up-invitation')}>
                   Crear Cuenta
                 </Button>
               </>
