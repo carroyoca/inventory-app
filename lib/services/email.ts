@@ -27,8 +27,7 @@ export async function sendInvitationEmail({
     }
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const acceptUrl = `${baseUrl}/invitations/${invitationId}/accept`
-    const rejectUrl = `${baseUrl}/invitations/${invitationId}/reject`
+    const joinUrl = `${baseUrl}/invitations/${invitationId}/join`
 
     const { data, error } = await resend.emails.send({
       from: 'Art Inventory <noreply@artinventory.com>',
@@ -39,8 +38,8 @@ export async function sendInvitationEmail({
         inviterName,
         inviterEmail,
         role,
-        acceptUrl,
-        rejectUrl,
+        acceptUrl: joinUrl,
+        rejectUrl: joinUrl, // Not used anymore but keeping for compatibility
       }),
     })
 

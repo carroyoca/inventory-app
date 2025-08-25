@@ -137,55 +137,7 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
     }
   }
 
-  const handleRejectInvitation = async (invitationId: string) => {
-    try {
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      const token = session?.access_token
-      
-      if (!token) {
-        toast({
-          title: "Error",
-          description: "No se pudo obtener el token de autenticación",
-          variant: "destructive"
-        })
-        return
-      }
 
-      const response = await fetch(`/api/invitations/${invitationId}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ status: 'rejected' })
-      })
-
-      const data = await response.json()
-
-      if (response.ok) {
-        toast({
-          title: "Invitación rechazada",
-          description: "La invitación ha sido rechazada",
-        })
-        fetchInvitations()
-        onInvitationUpdated?.()
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Error al rechazar la invitación",
-          variant: "destructive"
-        })
-      }
-    } catch (error) {
-      console.error('Error rejecting invitation:', error)
-      toast({
-        title: "Error",
-        description: "Error de conexión",
-        variant: "destructive"
-      })
-    }
-  }
 
   const handleDeleteInvitation = async (invitationId: string) => {
     if (!confirm('¿Estás seguro de que quieres eliminar esta invitación?')) {
@@ -344,28 +296,18 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
                 </div>
               </div>
 
-              {/* Action buttons */}
-              <div className="flex gap-2 mt-4 pt-4 border-t">
-                {invitation.status === 'pending' && (
-                  <>
-                    <Button
-                      size="sm"
-                      onClick={() => handleAcceptInvitation(invitation.id)}
-                      className="bg-green-600 hover:bg-green-700"
-                    >
-                      <Check className="h-4 w-4 mr-1" />
-                      Aceptar
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      onClick={() => handleRejectInvitation(invitation.id)}
-                    >
-                      <X className="h-4 w-4 mr-1" />
-                      Rechazar
-                    </Button>
-                  </>
-                )}
+                                {/* Action buttons */}
+                  <div className="flex gap-2 mt-4 pt-4 border-t">
+                    {invitation.status === 'pending' && (
+                      <Button
+                        size="sm"
+                        onClick={() => handleAcceptInvitation(invitation.id)}
+                        className="bg-green-600 hover:bg-green-700"
+                      >
+                        <Check className="h-4 w-4 mr-1" />
+                        Aceptar Invitación
+                      </Button>
+                    )}
                 
                 {/* Only owners/managers can delete invitations */}
                 {['owner', 'manager'].includes(userRole) && (

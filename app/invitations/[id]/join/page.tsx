@@ -4,17 +4,18 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, AlertCircle } from "lucide-react"
+import { Check, Loader2, AlertCircle, LogIn } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
-export default function AcceptInvitationPage() {
+export default function JoinProjectPage() {
   const params = useParams()
   const router = useRouter()
-  const [status, setStatus] = useState<'loading' | 'success' | 'error'>('loading')
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'login-required'>('loading')
   const [message, setMessage] = useState('')
+  const [projectName, setProjectName] = useState('')
 
   useEffect(() => {
-    const acceptInvitation = async () => {
+    const joinProject = async () => {
       try {
         const invitationId = params.id as string
         const supabase = createClient()
@@ -23,12 +24,12 @@ export default function AcceptInvitationPage() {
         const { data: { session } } = await supabase.auth.getSession()
         
         if (!session?.user) {
-          setStatus('error')
-          setMessage('Debes iniciar sesión para aceptar la invitación')
+          setStatus('login-required')
+          setMessage('Debes iniciar sesión para unirte al proyecto')
           return
         }
 
-        // Accept the invitation
+        // Accept the invitation automatically
         const response = await fetch(`/api/invitations/${invitationId}`, {
           method: 'PATCH',
           headers: {
@@ -42,34 +43,46 @@ export default function AcceptInvitationPage() {
 
         if (response.ok) {
           setStatus('success')
-          setMessage('¡Invitación aceptada exitosamente!')
+          setMessage('¡Te has unido exitosamente al proyecto!')
+          
+          // Get project name for better UX
+          if (data.data?.project?.name) {
+            setProjectName(data.data.project.name)
+          }
+          
+          // Redirect to dashboard after 2 seconds
+          setTimeout(() => {
+            router.push('/dashboard')
+          }, 2000)
         } else {
           setStatus('error')
-          setMessage(data.error || 'Error al aceptar la invitación')
+          setMessage(data.error || 'Error al unirse al proyecto')
         }
       } catch (error) {
-        console.error('Error accepting invitation:', error)
+        console.error('Error joining project:', error)
         setStatus('error')
         setMessage('Error de conexión')
       }
     }
 
-    acceptInvitation()
-  }, [params.id])
+    joinProject()
+  }, [params.id, router])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            {status === 'loading' && 'Procesando invitación...'}
-            {status === 'success' && '¡Invitación Aceptada!'}
+            {status === 'loading' && 'Uniéndote al proyecto...'}
+            {status === 'success' && '¡Bienvenido!'}
             {status === 'error' && 'Error'}
+            {status === 'login-required' && 'Inicio de Sesión Requerido'}
           </CardTitle>
           <CardDescription>
             {status === 'loading' && 'Estamos procesando tu invitación'}
-            {status === 'success' && 'Ya puedes acceder al proyecto'}
+            {status === 'success' && `Ya eres parte de ${projectName || 'el proyecto'}`}
             {status === 'error' && 'No se pudo procesar la invitación'}
+            {status === 'login-required' && 'Necesitas iniciar sesión para continuar'}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center space-y-4">
@@ -91,15 +104,42 @@ export default function AcceptInvitationPage() {
             </div>
           )}
           
+          {status === 'login-required' && (
+            <div className="flex justify-center">
+              <LogIn className="h-8 w-8 text-orange-600" />
+            </div>
+          )}
+          
           <p className="text-gray-600">{message}</p>
           
           <div className="flex gap-2 justify-center">
-            <Button onClick={() => router.push('/dashboard')}>
-              Ir al Dashboard
-            </Button>
-            <Button variant="outline" onClick={() => router.push('/projects')}>
-              Ver Proyectos
-            </Button>
+            {status === 'login-required' && (
+              <>
+                <Button onClick={() => router.push('/auth/login')}>
+                  Iniciar Sesión
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/auth/sign-up')}>
+                  Crear Cuenta
+                </Button>
+              </>
+            )}
+            
+            {status === 'success' && (
+              <Button onClick={() => router.push('/dashboard')}>
+                Ir al Dashboard
+              </Button>
+            )}
+            
+            {status === 'error' && (
+              <>
+                <Button onClick={() => router.push('/dashboard')}>
+                  Ir al Dashboard
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/projects')}>
+                  Ver Proyectos
+                </Button>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

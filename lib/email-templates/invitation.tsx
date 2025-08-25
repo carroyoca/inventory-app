@@ -100,18 +100,18 @@ export const InvitationEmail = ({
           
           <Section style={buttonContainer}>
             <Button style={acceptButton} href={acceptUrl}>
-              ✅ Aceptar Invitación
-            </Button>
-            
-            <Button style={rejectButton} href={rejectUrl}>
-              ❌ Rechazar Invitación
+              🚀 Unirse al Proyecto
             </Button>
           </Section>
           
           <Hr style={hr} />
           
           <Text style={footer}>
-            Esta invitación expira en 7 días. Si tienes alguna pregunta, contacta a{' '}
+            Haz clic en "Unirse al Proyecto" para acceder inmediatamente. Esta invitación expira en 7 días.
+          </Text>
+          
+          <Text style={footer}>
+            Si tienes alguna pregunta, contacta a{' '}
             <Link href={`mailto:${inviterEmail}`} style={link}>
               {inviterEmail}
             </Link>

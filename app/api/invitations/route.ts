@@ -241,6 +241,10 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (project && inviterProfile) {
+        console.log('📧 Attempting to send invitation email to:', invitee_email)
+        console.log('📧 Project:', project.name)
+        console.log('📧 Inviter:', inviterProfile.full_name || inviterProfile.email)
+        
         const emailResult = await sendInvitationEmail({
           to: invitee_email,
           projectName: project.name,
@@ -251,8 +255,12 @@ export async function POST(request: NextRequest) {
         })
         
         if (emailResult?.success === false) {
-          console.log('Email not sent:', emailResult.reason)
+          console.log('❌ Email not sent:', emailResult.reason)
+        } else {
+          console.log('✅ Email sent successfully:', emailResult)
         }
+      } else {
+        console.log('❌ Missing project or inviter profile for email')
       }
     } catch (emailError) {
       console.error('Error sending invitation email:', emailError)
