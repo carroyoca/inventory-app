@@ -22,6 +22,7 @@ import {
   getRoleDisplayName, 
   formatInvitationExpiryDate 
 } from "@/lib/utils/invitations"
+import { createClient } from "@/lib/supabase/client"
 import type { ProjectInvitationWithDetails } from "@/lib/types/invitations"
 
 interface InvitationsListProps {
@@ -38,7 +39,15 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
 
   const fetchInvitations = async () => {
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        console.error('No authentication token found')
+        return
+      }
+
       const url = projectId 
         ? `/api/invitations?project_id=${projectId}`
         : '/api/invitations'
@@ -80,7 +89,19 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
 
   const handleAcceptInvitation = async (invitationId: string) => {
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el token de autenticación",
+          variant: "destructive"
+        })
+        return
+      }
+
       const response = await fetch(`/api/invitations/${invitationId}`, {
         method: 'PATCH',
         headers: {
@@ -118,7 +139,19 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
 
   const handleRejectInvitation = async (invitationId: string) => {
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el token de autenticación",
+          variant: "destructive"
+        })
+        return
+      }
+
       const response = await fetch(`/api/invitations/${invitationId}`, {
         method: 'PATCH',
         headers: {
@@ -160,7 +193,19 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
     }
 
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el token de autenticación",
+          variant: "destructive"
+        })
+        return
+      }
+
       const response = await fetch(`/api/invitations/${invitationId}`, {
         method: 'DELETE',
         headers: {

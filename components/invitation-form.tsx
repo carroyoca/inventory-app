@@ -9,6 +9,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { useToast } from "@/hooks/use-toast"
 import { UserPlus, Send, Loader2 } from "lucide-react"
 import { getRoleDisplayName, getRoleDescription, canInviteToRole } from "@/lib/utils/invitations"
+import { createClient } from "@/lib/supabase/client"
 import type { CreateInvitationData } from "@/lib/types/invitations"
 
 interface InvitationFormProps {
@@ -54,7 +55,19 @@ export function InvitationForm({ projectId, userRole, onInvitationSent }: Invita
     setIsLoading(true)
 
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el token de autenticación",
+          variant: "destructive"
+        })
+        return
+      }
+
       const response = await fetch('/api/invitations', {
         method: 'POST',
         headers: {

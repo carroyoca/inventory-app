@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { User, Plus, ArrowLeft, Mail, Users } from "lucide-react"
 import Link from "next/link"
+import { createClient } from "@/lib/supabase/client"
 import { InvitationForm } from "@/components/invitation-form"
 import { InvitationsList } from "@/components/invitations-list"
 
@@ -30,7 +31,15 @@ export default function ProjectUsersPage() {
 
   const fetchMembers = async () => {
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        console.error('No authentication token found')
+        return
+      }
+
       const response = await fetch(`/api/projects/${activeProject.id}/members`, {
         headers: {
           'Authorization': `Bearer ${token}`
@@ -50,7 +59,15 @@ export default function ProjectUsersPage() {
 
   const fetchUserRole = async () => {
     try {
-      const token = localStorage.getItem('supabase.auth.token')
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+      
+      if (!token) {
+        console.error('No authentication token found')
+        return
+      }
+
       const response = await fetch(`/api/projects/${activeProject.id}/members/me`, {
         headers: {
           'Authorization': `Bearer ${token}`
