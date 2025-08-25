@@ -24,16 +24,22 @@ export function ProjectSwitcher({ selectedProject, onSwitch }: ProjectSwitcherPr
     
     setIsSwitching(true)
     try {
+      console.log('🔄 ProjectSwitcher: Starting switch to project:', selectedProject.id)
       await switchToProject(selectedProject.id)
+      console.log('✅ ProjectSwitcher: Successfully switched to project')
+      
+      // Add a small delay to ensure state is updated before navigation
+      await new Promise(resolve => setTimeout(resolve, 500))
       router.push('/dashboard')
     } catch (error) {
-      console.error('Error switching to project:', error)
+      console.error('❌ ProjectSwitcher: Error switching to project:', error)
       toast({
         title: "Error",
-        description: "Error switching to project. Please try again.",
+        description: `Error switching to project: ${error instanceof Error ? error.message : "Unknown error"}`,
         variant: "destructive"
       })
     } finally {
+      console.log('🔄 ProjectSwitcher: Setting isSwitching to false')
       setIsSwitching(false)
     }
   }
@@ -47,11 +53,21 @@ export function ProjectSwitcher({ selectedProject, onSwitch }: ProjectSwitcherPr
         </Button>
       ) : (
         <Button 
-          onClick={handleSwitch}
+          onClick={() => {
+            console.log('🔄 ProjectSwitcher: Button clicked, isSwitching:', isSwitching)
+            handleSwitch()
+          }}
           disabled={isSwitching}
-          className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white"
+          className="flex items-center gap-2 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {isSwitching ? 'Cambiando...' : 'Cambiar a Este Proyecto'}
+          {isSwitching ? (
+            <>
+              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+              Cambiando...
+            </>
+          ) : (
+            'Cambiar a Este Proyecto'
+          )}
         </Button>
       )}
       <Button 

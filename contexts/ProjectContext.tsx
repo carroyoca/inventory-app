@@ -111,6 +111,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw new Error("No authenticated user")
       }
 
+      console.log('🔄 ProjectContext: Session validated, fetching project data...')
+
       // Obtener el proyecto específico
       const { data: projects, error } = await supabase
         .from('project_members')
@@ -131,30 +133,42 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .eq('project_id', projectId)
         .single()
 
+      console.log('🔄 ProjectContext: Database query result:', { projects: !!projects, error })
+
       if (error) {
-        console.error('Error switching to project:', error)
-        throw error
+        console.error('❌ ProjectContext: Database error:', error)
+        throw new Error(`Failed to access project: ${error.message}`)
       }
 
-      if (projects) {
-        const project = {
-          ...projects.projects,
-          members: [{
-            id: projects.project_id,
-            project_id: projects.project_id,
-            user_id: session.user.id,
-            role: projects.role,
-            joined_at: projects.joined_at
-          }],
-          member_count: 1
-        } as any
-        console.log('🔄 ProjectContext: Switching to project:', project.name)
-        setActiveProject(project)
+      if (!projects) {
+        throw new Error("Project not found or you don't have access to it")
       }
+
+      if (!projects.projects) {
+        throw new Error("Project data is incomplete")
+      }
+
+      const project = {
+        ...projects.projects,
+        members: [{
+          id: projects.project_id,
+          project_id: projects.project_id,
+          user_id: session.user.id,
+          role: projects.role,
+          joined_at: projects.joined_at
+        }],
+        member_count: 1
+      } as any
+
+      console.log('✅ ProjectContext: Successfully prepared project data:', project.name)
+      setActiveProject(project)
+      
     } catch (error) {
-      console.error('Error in switchToProject:', error)
+      console.error('❌ ProjectContext: Error in switchToProject:', error)
+      setIsLoading(false) // Ensure loading is set to false on error
       throw error
     } finally {
+      console.log('🔄 ProjectContext: switchToProject completed, setting isLoading to false')
       setIsLoading(false)
     }
   }
