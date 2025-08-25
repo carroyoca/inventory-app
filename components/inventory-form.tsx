@@ -339,6 +339,25 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
+    // Check if categories are properly configured first
+    if (inventoryTypes.length === 0) {
+      toast({
+        title: "Configuration Required",
+        description: "No inventory types are configured for this project. Please configure inventory types in Project Actions first.",
+        variant: "destructive"
+      })
+      return
+    }
+    
+    if (houseZones.length === 0) {
+      toast({
+        title: "Configuration Required", 
+        description: "No house zones are configured for this project. Please configure house zones in Project Actions first.",
+        variant: "destructive"
+      })
+      return
+    }
+
     // Form validation
     const formData = new FormData(e.currentTarget)
     const requiredFields = {
@@ -350,7 +369,10 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     
     const missingFields = []
     for (const [field, label] of Object.entries(requiredFields)) {
-      if (!formData.get(field) || formData.get(field)?.toString().trim() === '') {
+      const fieldValue = formData.get(field)?.toString().trim()
+      if (!fieldValue || fieldValue === '' || 
+          fieldValue === 'no-types-configured' || 
+          fieldValue === 'no-zones-configured') {
         missingFields.push(label)
       }
     }
@@ -502,7 +524,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 </SelectItem>
               ))}
               {inventoryTypes.length === 0 && !loadingCategories && (
-                <SelectItem value="" disabled className="py-3 sm:py-2 text-gray-400">
+                <SelectItem value="no-types-configured" disabled className="py-3 sm:py-2 text-gray-400">
                   No hay tipos configurados. Configure en Acciones del Proyecto.
                 </SelectItem>
               )}
@@ -529,7 +551,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 </SelectItem>
               ))}
               {houseZones.length === 0 && !loadingCategories && (
-                <SelectItem value="" disabled className="py-3 sm:py-2 text-gray-400">
+                <SelectItem value="no-zones-configured" disabled className="py-3 sm:py-2 text-gray-400">
                   No hay áreas configuradas. Configure en Acciones del Proyecto.
                 </SelectItem>
               )}
