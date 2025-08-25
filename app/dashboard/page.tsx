@@ -1,84 +1,70 @@
 "use client"
 
-import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
-import { useProject } from '@/contexts/ProjectContext'
-import { ProjectHeader } from '@/components/project-header'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { useState, useEffect } from "react"
+import { useRouter } from "next/navigation"
+import { useProject } from "@/contexts/ProjectContext"
+import { ProjectHeader } from "@/components/project-header"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { 
-  Package, 
   Plus, 
+  FolderOpen, 
+  Package, 
   BarChart3, 
   Users, 
-  Settings,
   ArrowRight,
-  FolderOpen
-} from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-import { RecentItems } from '@/components/recent-items'
+  TrendingUp,
+  DollarSign,
+  Calendar,
+  MapPin
+} from "lucide-react"
+import { RecentItems } from "@/components/recent-items"
+
+interface InventoryStats {
+  totalItems: number
+  totalValue: number
+  isLoading: boolean
+}
 
 export default function DashboardPage() {
-  const { activeProject, isLoading } = useProject()
   const router = useRouter()
-  const [stats, setStats] = useState({
+  const { activeProject, isLoading: projectLoading } = useProject()
+  const [stats, setStats] = useState<InventoryStats>({
     totalItems: 0,
     totalValue: 0,
     isLoading: true
   })
 
-  // Cargar estadísticas del inventario
-  const loadInventoryStats = async () => {
+  useEffect(() => {
+    if (activeProject) {
+      fetchStats()
+    }
+  }, [activeProject])
+
+  const fetchStats = async () => {
     if (!activeProject) return
-    
+
     try {
-      const supabase = createClient()
-      const { data: items, error } = await supabase
-        .from('inventory_items')
-        .select('estimated_price, sale_price')
-        .eq('project_id', activeProject.id)
-
-      if (error) {
-        console.error('Error loading inventory stats:', error)
-        return
+      const response = await fetch(`/api/projects/${activeProject.id}/stats`)
+      if (response.ok) {
+        const data = await response.json()
+        setStats({
+          totalItems: data.totalItems || 0,
+          totalValue: data.totalValue || 0,
+          isLoading: false
+        })
       }
-
-      const totalItems = items?.length || 0
-      const totalValue = items?.reduce((sum, item) => {
-        const price = item.estimated_price || item.sale_price || 0
-        return sum + Number(price)
-      }, 0) || 0
-
-      setStats({
-        totalItems,
-        totalValue,
-        isLoading: false
-      })
     } catch (error) {
-      console.error('Error loading stats:', error)
+      console.error('Error fetching stats:', error)
       setStats(prev => ({ ...prev, isLoading: false }))
     }
   }
 
-  // Si no hay proyecto activo, redirigir a selección de proyecto
-  useEffect(() => {
-    if (!isLoading && !activeProject) {
-      router.push('/select-project')
-    }
-  }, [activeProject, isLoading, router])
-
-  // Cargar estadísticas cuando el proyecto cambie
-  useEffect(() => {
-    if (activeProject) {
-      loadInventoryStats()
-    }
-  }, [activeProject])
-
-  if (isLoading) {
+  if (projectLoading) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
           <p className="text-gray-600">Cargando proyecto...</p>
         </div>
       </div>
@@ -86,169 +72,194 @@ export default function DashboardPage() {
   }
 
   if (!activeProject) {
+    router.push('/select-project')
     return null
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      {/* Background Blur Effects */}
+      <div className="fixed inset-0 overflow-hidden pointer-events-none">
+        <div className="absolute -top-40 -right-40 w-80 h-80 bg-gradient-to-br from-purple-400/30 to-blue-400/30 rounded-full blur-3xl"></div>
+        <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-gradient-to-tr from-indigo-400/30 to-purple-400/30 rounded-full blur-3xl"></div>
+      </div>
+
       <ProjectHeader />
       
-      <main className="p-6">
-        {/* Header del Proyecto */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {activeProject.name}
+      <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
+        {/* Welcome Section */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
+            Bienvenido a tu Dashboard
           </h1>
-          {activeProject.description && (
-            <p className="text-gray-600 text-lg">{activeProject.description}</p>
-          )}
-          <div className="flex items-center space-x-4 mt-4 text-sm text-gray-500">
-            <span>Miembros: {activeProject.member_count}</span>
-            <span>•</span>
-            <span>Tu rol: {activeProject.members?.[0]?.role || 'Usuario'}</span>
-          </div>
+          <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+            Gestiona el inventario del proyecto <span className="font-semibold text-purple-600">{activeProject.name}</span>
+          </p>
         </div>
 
-        {/* Estadísticas Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
-              <Package className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.isLoading ? (
-                  <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
-                ) : (
-                  stats.totalItems
-                )}
+        {/* Stats Cards */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total Items</p>
+                  <div className="text-3xl font-bold text-gray-900">
+                    {stats.isLoading ? (
+                      <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      stats.totalItems
+                    )}
+                  </div>
+                </div>
+                <div className="p-3 bg-purple-100 rounded-xl">
+                  <Package className="h-6 w-6 text-purple-600" />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Items en este proyecto
-              </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
-              <BarChart3 className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">
-                {stats.isLoading ? (
-                  <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
-                ) : (
-                  `$${stats.totalValue.toLocaleString()}`
-                )}
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Valor Total</p>
+                  <div className="text-3xl font-bold text-gray-900">
+                    {stats.isLoading ? (
+                      <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                    ) : (
+                      `$${stats.totalValue.toLocaleString()}`
+                    )}
+                  </div>
+                </div>
+                <div className="p-3 bg-green-100 rounded-xl">
+                  <DollarSign className="h-6 w-6 text-green-600" />
+                </div>
               </div>
-              <p className="text-xs text-muted-foreground">
-                Valor estimado del inventario
-              </p>
             </CardContent>
           </Card>
 
-          <Card>
-            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-              <CardTitle className="text-sm font-medium">Miembros</CardTitle>
-              <Users className="h-4 w-4 text-muted-foreground" />
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold">{activeProject.member_count}</div>
-              <p className="text-xs text-muted-foreground">
-                Personas en el proyecto
-              </p>
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Miembros</p>
+                  <div className="text-3xl font-bold text-gray-900">
+                    {activeProject.member_count || 1}
+                  </div>
+                </div>
+                <div className="p-3 bg-blue-100 rounded-xl">
+                  <Users className="h-6 w-6 text-blue-600" />
+                </div>
+              </div>
             </CardContent>
           </Card>
         </div>
 
-        {/* Acciones Rápidas */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <Plus className="w-5 h-5 text-blue-600" />
-                <span>Agregar Item</span>
-              </CardTitle>
-              <CardDescription>
-                Añade un nuevo objeto o producto al inventario
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button 
-                onClick={() => router.push('/inventory/add')}
-                className="w-full"
-                size="lg"
-              >
-                Agregar Item
-                <ArrowRight className="ml-2 w-4 h-4" />
-              </Button>
+        {/* Quick Actions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
+                 onClick={() => router.push('/inventory/add')}>
+            <CardContent className="p-8">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-gradient-to-br from-purple-500 to-blue-500 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                  <Plus className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Agregar Item</h3>
+                  <p className="text-gray-600 mb-4">Añade un nuevo objeto o producto al inventario</p>
+                  <div className="flex items-center text-purple-600 font-medium">
+                    <span>Crear nuevo item</span>
+                    <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
             </CardContent>
           </Card>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <CardTitle className="flex items-center space-x-2">
-                <FolderOpen className="w-5 h-5 text-green-600" />
-                <span>Ver Inventario</span>
-              </CardTitle>
-              <CardDescription>
-                Explora y gestiona todos los items del proyecto
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
+                 onClick={() => router.push('/inventory')}>
+            <CardContent className="p-8">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 bg-gradient-to-br from-green-500 to-emerald-500 rounded-2xl group-hover:scale-110 transition-transform duration-300">
+                  <FolderOpen className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">Ver Inventario</h3>
+                  <p className="text-gray-600 mb-4">Explora y gestiona todos los items del proyecto</p>
+                  <div className="flex items-center text-green-600 font-medium">
+                    <span>Explorar inventario</span>
+                    <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Recent Items */}
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardHeader className="pb-6">
+            <div className="flex items-center justify-between">
+              <div>
+                <CardTitle className="text-2xl font-bold text-gray-900">Items Recientes</CardTitle>
+                <CardDescription className="text-gray-600">
+                  Los últimos items añadidos al inventario
+                </CardDescription>
+              </div>
               <Button 
-                variant="outline"
+                variant="outline" 
                 onClick={() => router.push('/inventory')}
-                className="w-full"
-                size="lg"
+                className="border-purple-200 text-purple-600 hover:bg-purple-50"
               >
-                Ver Inventario
-                <ArrowRight className="ml-2 w-4 h-4" />
+                Ver todos
+                <ArrowRight className="h-4 w-4 ml-2" />
               </Button>
-            </CardContent>
-          </Card>
-        </div>
-
-        {/* Items Recientes */}
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Package className="w-5 h-5 text-blue-600" />
-              <span>Items Recientes</span>
-            </CardTitle>
-            <CardDescription>
-              Los últimos items añadidos al inventario
-            </CardDescription>
+            </div>
           </CardHeader>
           <CardContent>
             <RecentItems projectId={activeProject.id} />
           </CardContent>
         </Card>
 
-        {/* Configuración del Proyecto */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center space-x-2">
-              <Settings className="w-5 h-5 text-gray-600" />
-              <span>Configuración del Proyecto</span>
-            </CardTitle>
-            <CardDescription>
-              Gestiona la configuración y miembros del proyecto
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <Button 
-              variant="outline"
-              onClick={() => router.push('/projects')}
-              className="w-full"
-            >
-              Gestionar Proyecto
-              <ArrowRight className="ml-2 w-4 h-4" />
-            </Button>
-          </CardContent>
-        </Card>
+        {/* Project Management Quick Access */}
+        <div className="mt-12">
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Gestión del Proyecto</h2>
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+                   onClick={() => router.push(`/projects/${activeProject.id}/areas`)}>
+              <CardContent className="p-6 text-center">
+                <div className="p-3 bg-blue-100 rounded-xl w-fit mx-auto mb-4">
+                  <MapPin className="h-6 w-6 text-blue-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Areas</h3>
+                <p className="text-sm text-gray-600">Gestionar zonas y habitaciones</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+                   onClick={() => router.push(`/projects/${activeProject.id}/users`)}>
+              <CardContent className="p-6 text-center">
+                <div className="p-3 bg-green-100 rounded-xl w-fit mx-auto mb-4">
+                  <Users className="h-6 w-6 text-green-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Usuarios</h3>
+                <p className="text-sm text-gray-600">Gestionar miembros del proyecto</p>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+                   onClick={() => router.push('/projects')}>
+              <CardContent className="p-6 text-center">
+                <div className="p-3 bg-purple-100 rounded-xl w-fit mx-auto mb-4">
+                  <BarChart3 className="h-6 w-6 text-purple-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Configuración</h3>
+                <p className="text-sm text-gray-600">Ajustes del proyecto</p>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
       </main>
     </div>
   )
