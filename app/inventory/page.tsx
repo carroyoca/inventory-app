@@ -159,7 +159,7 @@ export default function InventoryPage() {
               </div>
             </div>
             <Button asChild size="sm" className="h-8 px-2 sm:h-9 sm:px-3">
-              <Link href="/dashboard">
+              <Link href="/inventory/add">
                 <Plus className="h-4 w-4 sm:mr-2" />
                 <span className="hidden sm:inline">Add</span>
               </Link>
@@ -195,7 +195,7 @@ export default function InventoryPage() {
                   <h3 className="text-lg font-medium text-gray-900 mb-2">No inventory items yet</h3>
                   <p className="text-gray-500 mb-4">Start by adding your first art piece to the collection.</p>
                   <Button asChild>
-                    <Link href="/dashboard">
+                    <Link href="/inventory/add">
                       <Plus className="h-4 w-4 mr-2" />
                       Add First Item
                     </Link>

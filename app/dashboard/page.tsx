@@ -177,7 +177,7 @@ export default function DashboardPage() {
             </CardHeader>
             <CardContent>
               <Button 
-                onClick={() => router.push('/inventory')}
+                onClick={() => router.push('/inventory/add')}
                 className="w-full"
                 size="lg"
               >
