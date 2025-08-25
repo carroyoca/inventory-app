@@ -49,12 +49,7 @@ export async function GET(
         id,
         user_id,
         role,
-        joined_at,
-        user:profiles!project_members_user_id_fkey (
-          id,
-          full_name,
-          email
-        )
+        joined_at
       `)
       .eq('project_id', projectId)
       .order('joined_at', { ascending: true })
@@ -67,9 +62,33 @@ export async function GET(
       )
     }
 
+    // Get user details for each member
+    const membersWithDetails = await Promise.all(
+      members.map(async (member) => {
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('id', member.user_id)
+          .single()
+
+        return {
+          ...member,
+          user: profile || { id: member.user_id, full_name: null, email: null }
+        }
+      })
+    )
+
+    if (error) {
+      console.error('Error fetching project members:', error)
+      return NextResponse.json(
+        { error: 'Failed to fetch project members' },
+        { status: 500 }
+      )
+    }
+
     return NextResponse.json({
       success: true,
-      data: members
+      data: membersWithDetails
     })
 
   } catch (error) {

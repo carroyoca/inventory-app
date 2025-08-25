@@ -152,11 +152,11 @@ export default function ProjectUsersPage() {
                       <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg bg-white/50">
                         <div className="flex items-center gap-3">
                           <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
-                            {member.full_name ? member.full_name.charAt(0).toUpperCase() : member.email.charAt(0).toUpperCase()}
+                            {member.user?.full_name ? member.user.full_name.charAt(0).toUpperCase() : member.user?.email?.charAt(0).toUpperCase() || 'U'}
                           </div>
                           <div>
-                            <p className="font-medium">{member.full_name || 'Sin nombre'}</p>
-                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                            <p className="font-medium">{member.user?.full_name || 'Sin nombre'}</p>
+                            <p className="text-sm text-muted-foreground">{member.user?.email}</p>
                             <p className="text-xs text-muted-foreground">
                               Se unió el {new Date(member.joined_at).toLocaleDateString()}
                             </p>

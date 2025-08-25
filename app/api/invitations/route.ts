@@ -32,8 +32,7 @@ export async function GET(request: NextRequest) {
       .from('project_invitations')
       .select(`
         *,
-        project:projects(id, name, description),
-        inviter:profiles!project_invitations_inviter_id_fkey(id, full_name, email)
+        project:projects(id, name, description)
       `)
 
     // Filter by project if specified
@@ -78,9 +77,25 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get inviter details for each invitation
+    const invitationsWithDetails = await Promise.all(
+      invitations.map(async (invitation) => {
+        const { data: inviter } = await supabase
+          .from('profiles')
+          .select('id, full_name, email')
+          .eq('id', invitation.inviter_id)
+          .single()
+
+        return {
+          ...invitation,
+          inviter: inviter || { id: invitation.inviter_id, full_name: null, email: null }
+        }
+      })
+    )
+
     return NextResponse.json({
       success: true,
-      data: invitations
+      data: invitationsWithDetails
     } as InvitationsListResponse)
 
   } catch (error) {
