@@ -6,6 +6,7 @@ import { Check } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProject } from "@/contexts/ProjectContext"
 import type { ProjectWithMembers } from "@/lib/types/projects"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectSwitcherProps {
   selectedProject: ProjectWithMembers
@@ -13,6 +14,7 @@ interface ProjectSwitcherProps {
 }
 
 export function ProjectSwitcher({ selectedProject, onSwitch }: ProjectSwitcherProps) {
+  const { toast } = useToast()
   const { activeProject, switchToProject } = useProject()
   const router = useRouter()
   const [isSwitching, setIsSwitching] = useState(false)
@@ -26,7 +28,11 @@ export function ProjectSwitcher({ selectedProject, onSwitch }: ProjectSwitcherPr
       router.push('/dashboard')
     } catch (error) {
       console.error('Error switching to project:', error)
-      alert('Error switching to project. Please try again.')
+      toast({
+        title: "Error",
+        description: "Error switching to project. Please try again.",
+        variant: "destructive"
+      })
     } finally {
       setIsSwitching(false)
     }

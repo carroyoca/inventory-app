@@ -14,6 +14,7 @@ import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useProject } from "@/contexts/ProjectContext"
+import { useToast } from "@/hooks/use-toast"
 
 interface ProjectCategory {
   id: string
@@ -59,6 +60,7 @@ interface InventoryFormProps {
 }
 
 export function InventoryForm({ mode = 'create', initialData, onSuccess }: InventoryFormProps) {
+  const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
@@ -157,7 +159,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       // Check if file is valid
       if (!file.name || file.size === 0) {
         console.error("Invalid file detected:", file)
-        alert(`File ${file.name || 'Unknown'} appears to be invalid. Please try selecting a different photo.`)
+        toast({
+          title: "Invalid File",
+          description: `File ${file.name || 'Unknown'} appears to be invalid. Please try selecting a different photo.`,
+          variant: "destructive"
+        })
         continue
       }
     }
@@ -184,7 +190,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       const fileSizeMB = file.size / (1024 * 1024)
       if (fileSizeMB > 50) {
         console.warn("Large file detected:", fileSizeMB.toFixed(2) + " MB")
-        alert(`File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`)
+        toast({
+          title: "Large File Warning",
+          description: `File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`,
+          variant: "default"
+        })
       }
       
       // Try alternative upload method for iOS
@@ -206,7 +216,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           await uploadFileStandard(file)
         } catch (error) {
           console.error("Standard upload also failed:", error)
-          alert(`Failed to upload ${file.name}. Please try again or contact support.`)
+          toast({
+            title: "Upload Failed",
+            description: `Failed to upload ${file.name}. Please try again or contact support.`,
+            variant: "destructive"
+          })
         }
       }
       
@@ -342,13 +356,21 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     }
     
     if (missingFields.length > 0) {
-      alert(`Please fill in the following required fields:\n${missingFields.join('\n')}`)
+      toast({
+        title: "Required Fields Missing",
+        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        variant: "destructive"
+      })
       return
     }
     
     // Check if at least one photo is uploaded
     if (uploadedPhotos.length === 0) {
-      alert("Please upload at least one photo before submitting.")
+      toast({
+        title: "Photo Required",
+        description: "Please upload at least one photo before submitting.",
+        variant: "destructive"
+      })
       return
     }
     
@@ -433,7 +455,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       const successMessage = mode === 'edit' 
         ? "Inventory item updated successfully!" 
         : "Inventory item added successfully!"
-      alert(successMessage)
+      toast({
+        title: "Success",
+        description: successMessage,
+        variant: "default"
+      })
       
       // Call onSuccess callback or redirect
       if (onSuccess) {
@@ -444,7 +470,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }
     } catch (error) {
       console.error("Error adding item:", error)
-      alert(error instanceof Error ? error.message : "Failed to add inventory item")
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to add inventory item",
+        variant: "destructive"
+      })
     } finally {
       setIsSubmitting(false)
     }
@@ -598,7 +628,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                   fileInputRef.current.click()
                 } else {
                   console.error("File input ref not found")
-                  alert("Error: File input not found. Please refresh the page.")
+                  toast({
+                    title: "Error",
+                    description: "File input not found. Please refresh the page.",
+                    variant: "destructive"
+                  })
                 }
               }}
               className="h-11 sm:h-10 w-full sm:w-auto"

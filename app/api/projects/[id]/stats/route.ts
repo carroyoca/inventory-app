@@ -7,6 +7,14 @@ export async function GET(
 ) {
   try {
     const { id: projectId } = await params
+    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
 
     if (!projectId) {
       return NextResponse.json(
@@ -16,6 +24,30 @@ export async function GET(
     }
 
     const supabase = createServiceRoleClient()
+    
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Invalid authentication' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user is a member of this project
+    const { data: membership, error: membershipError } = await supabase
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !membership) {
+      return NextResponse.json(
+        { error: 'You do not have access to this project' },
+        { status: 403 }
+      )
+    }
 
     // Get inventory items for this project
     const { data: items, error } = await supabase

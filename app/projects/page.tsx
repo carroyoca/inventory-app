@@ -7,6 +7,7 @@ import { Card, CardContent } from "@/components/ui/card"
 import { ArrowLeft, Plus, Check, MapPin, Users, Package, Settings, BarChart3, FileText, FolderOpen } from "lucide-react"
 import { useRouter } from "next/navigation"
 import type { ProjectWithMembers } from "@/lib/types/projects"
+import { useToast } from "@/hooks/use-toast"
 
 // Dynamic imports to avoid SSR issues
 const ProjectSwitcher = dynamic(() => import('@/components/project-switcher').then(mod => ({ default: mod.ProjectSwitcher })), {
@@ -23,6 +24,7 @@ const ProjectHeader = dynamic(() => import('@/components/project-header').then(m
 import dynamic from 'next/dynamic'
 
 export default function ProjectsPage() {
+  const { toast } = useToast()
   const [selectedProject, setSelectedProject] = useState<ProjectWithMembers | null>(null)
   const [mounted, setMounted] = useState(false)
   const [projectContext, setProjectContext] = useState<any>(null)
@@ -48,7 +50,11 @@ export default function ProjectsPage() {
       router.push('/dashboard')
     } catch (error) {
       console.error('Error switching to project:', error)
-      alert('Error switching to project. Please try again.')
+      toast({
+        title: "Error",
+        description: "Error switching to project. Please try again.",
+        variant: "destructive"
+      })
     }
   }
 

@@ -1,5 +1,6 @@
 import { put } from "@vercel/blob"
 import { type NextRequest, NextResponse } from "next/server"
+import { createServiceRoleClient } from "@/lib/supabase/api-client"
 
 export async function OPTIONS() {
   return new NextResponse(null, {
@@ -16,6 +17,23 @@ export async function POST(request: NextRequest) {
   try {
     console.log("Upload API called")
     
+    // Get authorization header and verify authentication
+    const authHeader = request.headers.get('authorization')
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return NextResponse.json({ error: "Authorization header required" }, { status: 401 })
+    }
+
+    const token = authHeader.replace('Bearer ', '')
+    const supabase = createServiceRoleClient()
+    
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json({ error: "Invalid authentication" }, { status: 401 })
+    }
+
+    console.log("✅ User authenticated:", user.id)
+    
     const formData = await request.formData()
     console.log("Form data received:", formData)
     
@@ -31,9 +49,20 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "No file provided" }, { status: 400 })
     }
 
-    // Create a unique filename with timestamp to avoid conflicts
+    // Validate file type (only allow images)
+    if (!file.type.startsWith('image/')) {
+      return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 })
+    }
+
+    // Validate file size (limit to 10MB)
+    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    if (file.size > MAX_FILE_SIZE) {
+      return NextResponse.json({ error: "File size too large. Maximum 10MB allowed." }, { status: 400 })
+    }
+
+    // Create a unique filename with user ID and timestamp to avoid conflicts
     const timestamp = Date.now()
-    const filename = `inventory/${timestamp}-${file.name}`
+    const filename = `inventory/${user.id}/${timestamp}-${file.name}`
     console.log("Uploading to filename:", filename)
 
     // Check if Blob token is available

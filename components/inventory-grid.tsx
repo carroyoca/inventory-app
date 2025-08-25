@@ -8,6 +8,7 @@ import Image from "next/image"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useToast } from "@/hooks/use-toast"
 
 interface InventoryItem {
   id: string
@@ -38,6 +39,7 @@ const statusColors = {
 }
 
 export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
+  const { toast } = useToast()
   const router = useRouter()
 
   const handleDelete = async (id: string) => {
@@ -109,7 +111,11 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       console.error("Error type:", typeof error)
       console.error("Error message:", error instanceof Error ? error.message : "Unknown error")
       console.error("Error stack:", error instanceof Error ? error.stack : "No stack")
-      alert(`Error deleting item: ${error instanceof Error ? error.message : "Unknown error"}`)
+      toast({
+        title: "Delete Error",
+        description: `Error deleting item: ${error instanceof Error ? error.message : "Unknown error"}`,
+        variant: "destructive"
+      })
     }
   }
 
