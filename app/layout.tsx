@@ -2,10 +2,12 @@ import type { Metadata } from 'next'
 import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
+import { ProjectProvider } from '@/contexts/ProjectContext'
+import { ThemeProvider } from '@/components/theme-provider'
 
 export const metadata: Metadata = {
-  title: 'v0 App',
-  description: 'Created with v0',
+  title: 'Inventory App - Gestión de Proyectos',
+  description: 'Sistema de inventario basado en proyectos para organizar y gestionar objetos',
   generator: 'v0.app',
 }
 
@@ -15,7 +17,7 @@ export default function RootLayout({
   children: React.ReactNode
 }>) {
   return (
-    <html lang="en">
+    <html lang="es" suppressHydrationWarning>
       <head>
         <style>{`
 html {
@@ -25,7 +27,18 @@ html {
 }
         `}</style>
       </head>
-      <body>{children}</body>
+      <body>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          disableTransitionOnChange
+        >
+          <ProjectProvider>
+            {children}
+          </ProjectProvider>
+        </ThemeProvider>
+      </body>
     </html>
   )
 }

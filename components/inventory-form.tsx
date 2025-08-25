@@ -13,6 +13,7 @@ import { Upload, X, Plus, Loader2 } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
+import { useProject } from "@/contexts/ProjectContext"
 
 const PRODUCT_TYPES = [
   "Painting",
@@ -62,6 +63,7 @@ export function InventoryForm() {
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([])
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const { activeProject } = useProject()
 
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || [])
@@ -298,6 +300,11 @@ export function InventoryForm() {
         throw new Error("You must be logged in to add inventory items")
       }
 
+      // Check if user has an active project
+      if (!activeProject) {
+        throw new Error("You must select a project before adding inventory items")
+      }
+
       // Use uploaded photo URLs
       const photoUrls = uploadedPhotos.map((photo) => photo.url)
 
@@ -315,6 +322,7 @@ export function InventoryForm() {
         listing_link: formData.get("listing_link"),
         photos: photoUrls,
         created_by: user.id,
+        project_id: activeProject.id,
       })
 
       if (error) {
@@ -341,8 +349,8 @@ export function InventoryForm() {
       // Show success message
       alert("Inventory item added successfully!")
       
-      // Redirect to inventory page
-      router.push("/inventory")
+      // Redirect to dashboard (project-specific)
+      router.push("/dashboard")
     } catch (error) {
       console.error("Error adding item:", error)
       alert(error instanceof Error ? error.message : "Failed to add inventory item")

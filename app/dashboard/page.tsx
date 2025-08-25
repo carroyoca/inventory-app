@@ -1,217 +1,179 @@
-'use client'
+"use client"
 
-import { useEffect, useState } from 'react'
-import { createClient } from "@/lib/supabase/client"
-import { InventoryForm } from "@/components/inventory-form"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
-import { PlusCircle, Package, LogOut, Search, FolderOpen } from "lucide-react"
-import Link from "next/link"
+import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import { useProject } from '@/contexts/ProjectContext'
+import { ProjectHeader } from '@/components/project-header'
+import { Button } from '@/components/ui/button'
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { 
+  Package, 
+  Plus, 
+  BarChart3, 
+  Users, 
+  Settings,
+  ArrowRight,
+  FolderOpen
+} from 'lucide-react'
 
 export default function DashboardPage() {
-  const [user, setUser] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
+  const { activeProject, isLoading } = useProject()
   const router = useRouter()
-  const supabase = createClient()
 
+  // Si no hay proyecto activo, redirigir a selección de proyecto
   useEffect(() => {
-    async function getUser() {
-      try {
-        const { data: { user } } = await supabase.auth.getUser()
-        if (!user) {
-          router.push('/auth/login')
-          return
-        }
-        setUser(user)
-      } catch (error) {
-        console.error('Error getting user:', error)
-        router.push('/auth/login')
-      } finally {
-        setLoading(false)
-      }
+    if (!isLoading && !activeProject) {
+      router.push('/select-project')
     }
+  }, [activeProject, isLoading, router])
 
-    getUser()
-  }, [supabase.auth, router])
-
-  const handleSignOut = async () => {
-    await supabase.auth.signOut()
-    router.push('/')
-  }
-
-  if (loading) {
+  if (isLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-4 text-gray-600">Loading...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando proyecto...</p>
         </div>
       </div>
     )
   }
 
-  if (!user) {
+  if (!activeProject) {
     return null
   }
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <header className="bg-white shadow-sm border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center h-14 sm:h-16">
-            <div className="flex items-center gap-2">
-              <Package className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
-              <h1 className="text-lg sm:text-2xl font-bold text-gray-900">Art Inventory</h1>
-            </div>
-            <div className="flex items-center gap-2 sm:gap-4">
-              <span className="text-xs sm:text-sm text-gray-600 hidden sm:block">Welcome, {user.email}</span>
-              <Button variant="ghost" size="sm" onClick={handleSignOut} className="h-8 px-2 sm:h-9 sm:px-3">
-                <LogOut className="h-4 w-4 sm:mr-2" />
-                <span className="hidden sm:inline">Sign Out</span>
+      <ProjectHeader />
+      
+      <main className="p-6">
+        {/* Header del Proyecto */}
+        <div className="mb-8">
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {activeProject.name}
+          </h1>
+          {activeProject.description && (
+            <p className="text-gray-600 text-lg">{activeProject.description}</p>
+          )}
+          <div className="flex items-center space-x-4 mt-4 text-sm text-gray-500">
+            <span>Miembros: {activeProject.member_count}</span>
+            <span>•</span>
+            <span>Tu rol: {activeProject.members?.[0]?.role || 'Usuario'}</span>
+          </div>
+        </div>
+
+        {/* Estadísticas Rápidas */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+              <Package className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">0</div>
+              <p className="text-xs text-muted-foreground">
+                Items en este proyecto
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Valor Total</CardTitle>
+              <BarChart3 className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">$0</div>
+              <p className="text-xs text-muted-foreground">
+                Valor estimado del inventario
+              </p>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+              <CardTitle className="text-sm font-medium">Miembros</CardTitle>
+              <Users className="h-4 w-4 text-muted-foreground" />
+            </CardHeader>
+            <CardContent>
+              <div className="text-2xl font-bold">{activeProject.member_count}</div>
+              <p className="text-xs text-muted-foreground">
+                Personas en el proyecto
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Acciones Rápidas */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <Plus className="w-5 h-5 text-blue-600" />
+                <span>Agregar Item</span>
+              </CardTitle>
+              <CardDescription>
+                Añade un nuevo objeto o producto al inventario
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                onClick={() => router.push('/inventory')}
+                className="w-full"
+                size="lg"
+              >
+                Agregar Item
+                <ArrowRight className="ml-2 w-4 h-4" />
               </Button>
-            </div>
-          </div>
+            </CardContent>
+          </Card>
+
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+            <CardHeader>
+              <CardTitle className="flex items-center space-x-2">
+                <FolderOpen className="w-5 h-5 text-green-600" />
+                <span>Ver Inventario</span>
+              </CardTitle>
+              <CardDescription>
+                Explora y gestiona todos los items del proyecto
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Button 
+                variant="outline"
+                onClick={() => router.push('/inventory')}
+                className="w-full"
+                size="lg"
+              >
+                Ver Inventario
+                <ArrowRight className="ml-2 w-4 h-4" />
+              </Button>
+            </CardContent>
+          </Card>
         </div>
-      </header>
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 sm:py-8">
-        <div className="space-y-6 lg:space-y-8">
-          {/* Mobile-first layout */}
-          <div className="lg:hidden">
-            {/* Quick Actions - Mobile First */}
-            <Card className="mb-6">
-              <CardHeader className="pb-4">
-                <CardTitle className="text-lg">Quick Actions</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button asChild className="w-full h-12 text-base">
-                  <Link href="/inventory">
-                    <Package className="h-5 w-5 mr-3" />
-                    View All Items
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full h-12 text-base bg-transparent">
-                  <Link href="/projects">
-                    <FolderOpen className="h-5 w-5 mr-3" />
-                    Manage Projects
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full h-12 text-base bg-transparent">
-                  <Link href="/inventory">
-                    <Search className="h-5 w-5 mr-3" />
-                    Search Inventory
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Add New Item Form - Mobile */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg">
-                  <PlusCircle className="h-5 w-5" />
-                  Add New Item
-                </CardTitle>
-                <CardDescription className="text-sm">Add a new art piece to your collection.</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <InventoryForm />
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Desktop layout */}
-          <div className="hidden lg:grid lg:grid-cols-3 lg:gap-6">
-            {/* Quick Actions */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Package className="h-5 w-5" />
-                  Inventory
-                </CardTitle>
-                <CardDescription>Manage your art collection</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button asChild className="w-full">
-                  <Link href="/inventory">
-                    <Package className="h-4 w-4 mr-2" />
-                    View All Items
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/inventory">
-                    <Search className="h-4 w-4 mr-2" />
-                    Search & Filter
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Projects Management */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <FolderOpen className="h-5 w-5" />
-                  Projects
-                </CardTitle>
-                <CardDescription>Organize by property or collection</CardDescription>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <Button asChild className="w-full">
-                  <Link href="/projects">
-                    <FolderOpen className="h-4 w-4 mr-2" />
-                    Manage Projects
-                  </Link>
-                </Button>
-                <Button asChild variant="outline" className="w-full bg-transparent">
-                  <Link href="/projects">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Create New Project
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-
-            {/* Add New Item */}
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <PlusCircle className="h-5 w-5" />
-                  Add Item
-                </CardTitle>
-                <CardDescription>Add new artwork to your inventory</CardDescription>
-              </CardHeader>
-              <CardContent>
-                <Button asChild className="w-full">
-                  <Link href="#add-item">
-                    <PlusCircle className="h-4 w-4 mr-2" />
-                    Add New Item
-                  </Link>
-                </Button>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Add New Item Form Section */}
-          <div id="add-item" className="pt-8">
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-xl">
-                  <PlusCircle className="h-6 w-6" />
-                  Add New Inventory Item
-                </CardTitle>
-                <CardDescription>
-                  Add a new art piece to your collection with photos, pricing, and location details.
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <InventoryForm />
-              </CardContent>
-            </Card>
-          </div>
-        </div>
+        {/* Configuración del Proyecto */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Settings className="w-5 h-5 text-gray-600" />
+              <span>Configuración del Proyecto</span>
+            </CardTitle>
+            <CardDescription>
+              Gestiona la configuración y miembros del proyecto
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button 
+              variant="outline"
+              onClick={() => router.push('/projects')}
+              className="w-full"
+            >
+              Gestionar Proyecto
+              <ArrowRight className="ml-2 w-4 h-4" />
+            </Button>
+          </CardContent>
+        </Card>
       </main>
     </div>
   )

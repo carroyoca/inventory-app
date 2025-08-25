@@ -40,21 +40,24 @@ export async function GET(request: NextRequest) {
 
     console.log("✅ User authenticated:", user.id)
 
-    // Get projects where user is a member
+    // Get projects where user is a member - Simplified query
     const { data: projects, error: projectsError } = await supabase
-      .from('projects')
+      .from('project_members')
       .select(`
-        *,
-        members!project_members(
+        project_id,
+        role,
+        joined_at,
+        projects (
           id,
-          user_id,
-          role,
-          joined_at,
-          user:user_id(email)
+          name,
+          description,
+          created_by,
+          created_at,
+          updated_at
         )
       `)
-      .eq('members.user_id', user.id)
-      .order('created_at', { ascending: false })
+      .eq('user_id', user.id)
+      .order('joined_at', { ascending: false })
 
     if (projectsError) {
       console.error("❌ Error fetching projects:", projectsError)
@@ -65,10 +68,15 @@ export async function GET(request: NextRequest) {
     }
 
     // Transform data to match our types
-    const transformedProjects = projects?.map(project => ({
-      ...project,
-      members: project.members || [],
-      member_count: project.members?.length || 0
+    const transformedProjects = projects?.map(member => ({
+      ...member.projects,
+      members: [{
+        id: member.project_id,
+        user_id: user.id,
+        role: member.role,
+        joined_at: member.joined_at
+      }],
+      member_count: 1
     })) || []
 
     console.log(`✅ Found ${transformedProjects.length} projects for user`)
