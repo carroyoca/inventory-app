@@ -167,7 +167,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // Cargar proyecto activo y escuchar cambios de autenticación
   useEffect(() => {
     console.log('🔄 ProjectContext: Initial useEffect triggered')
-    getActiveProject()
+    
+    // Add a small delay to ensure the component is fully mounted
+    const timer = setTimeout(() => {
+      getActiveProject()
+    }, 100)
 
     // Listen to auth changes
     const supabase = createClient()
@@ -188,6 +192,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
     return () => {
       console.log('🔄 ProjectContext: Cleaning up auth listener')
+      clearTimeout(timer)
       subscription.unsubscribe()
     }
   }, [])

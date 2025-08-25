@@ -1,31 +1,44 @@
-import { createClient } from "@/lib/supabase/server"
-import { redirect } from "next/navigation"
+"use client"
+
+import { useEffect } from "react"
+import { useRouter } from "next/navigation"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { createClient } from "@/lib/supabase/client"
 
-export default async function HomePage() {
-  const supabase = await createClient()
-  const {
-    data: { user },
-  } = await supabase.auth.getUser()
+export default function HomePage() {
+  const router = useRouter()
 
-  if (user) {
-    // Check if user has any projects
-    const { data: projects, error } = await supabase
-      .from('project_members')
-      .select('project_id')
-      .eq('user_id', user.id)
-      .limit(1)
-    
-    if (!error && projects && projects.length > 0) {
-      // User has projects, redirect to dashboard
-      redirect("/dashboard")
-    } else {
-      // User has no projects, redirect to project selection
-      redirect("/select-project")
+  useEffect(() => {
+    const checkAuth = async () => {
+      try {
+        const supabase = createClient()
+        const { data: { user } } = await supabase.auth.getUser()
+
+        if (user) {
+          // Check if user has any projects
+          const { data: projects, error } = await supabase
+            .from('project_members')
+            .select('project_id')
+            .eq('user_id', user.id)
+            .limit(1)
+          
+          if (!error && projects && projects.length > 0) {
+            // User has projects, redirect to dashboard
+            router.push("/dashboard")
+          } else {
+            // User has no projects, redirect to project selection
+            router.push("/select-project")
+          }
+        }
+      } catch (error) {
+        console.error('HomePage auth check error:', error)
+      }
     }
-  }
+
+    checkAuth()
+  }, [router])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center p-4">
