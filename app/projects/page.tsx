@@ -133,116 +133,26 @@ export default function ProjectsPage() {
               </div>
             </div>
 
-            {/* Project Actions */}
-            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-8">
-              <div className="flex items-center justify-between mb-8">
-                <div>
-                  <h3 className="text-2xl font-bold text-gray-900 mb-2">Acciones del Proyecto</h3>
-                  <p className="text-gray-600">Gestiona este proyecto y su inventario</p>
-                </div>
+            {/* Project Selection Actions */}
+            <div className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-8 text-center">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">
+                ¿Cambiar al proyecto "{selectedProject.name}"?
+              </h3>
+              <p className="text-gray-600 mb-6">
+                Accede al dashboard del proyecto para gestionar inventario y todas las configuraciones
+              </p>
+              <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <ProjectSwitcher 
                   selectedProject={selectedProject}
                   onSwitch={handleSwitchToProject}
                 />
-              </div>
-
-              {/* Project Management Grid */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {/* Areas Management */}
-                <Card 
-                  className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                  onClick={() => router.push(`/projects/${selectedProject.id}/areas`)}
+                <Button 
+                  variant="outline" 
+                  onClick={handleBackToProjects}
+                  className="border-gray-300 text-gray-600 hover:bg-gray-50"
                 >
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <MapPin className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Areas</h4>
-                        <p className="text-gray-600">Gestionar zonas y habitaciones</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Users Management */}
-                <Card 
-                  className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
-                  onClick={() => router.push(`/projects/${selectedProject.id}/users`)}
-                >
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-green-500 to-green-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <Users className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Usuarios</h4>
-                        <p className="text-gray-600">Gestionar miembros del proyecto</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Inventory Types */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <Package className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Tipos de Inventario</h4>
-                        <p className="text-gray-600">Personalizar categorías de productos</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Project Settings */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-gray-500 to-gray-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <Settings className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Configuración</h4>
-                        <p className="text-gray-600">Configuración del proyecto</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Analytics */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-orange-500 to-orange-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <BarChart3 className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Analíticas</h4>
-                        <p className="text-gray-600">Informes e insights del proyecto</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-
-                {/* Export */}
-                <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group">
-                  <CardContent className="p-6">
-                    <div className="flex items-center space-x-4">
-                      <div className="p-3 bg-gradient-to-br from-red-500 to-red-600 rounded-xl group-hover:scale-110 transition-transform duration-300">
-                        <FileText className="h-6 w-6 text-white" />
-                      </div>
-                      <div className="flex-1">
-                        <h4 className="font-semibold text-gray-900 text-lg">Exportar</h4>
-                        <p className="text-gray-600">Exportar datos del inventario</p>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
+                  Elegir Otro Proyecto
+                </Button>
               </div>
             </div>
           </div>

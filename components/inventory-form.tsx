@@ -15,32 +15,11 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useProject } from "@/contexts/ProjectContext"
 
-const PRODUCT_TYPES = [
-  "Painting",
-  "Sculpture",
-  "Ceramic",
-  "Photography",
-  "Drawing",
-  "Print",
-  "Mixed Media",
-  "Textile",
-  "Jewelry",
-  "Other",
-]
-
-const HOUSE_ZONES = [
-  "Living Room",
-  "Bedroom",
-  "Kitchen",
-  "Dining Room",
-  "Study",
-  "Hallway",
-  "Basement",
-  "Attic",
-  "Garden",
-  "Garage",
-  "Storage",
-]
+interface ProjectCategory {
+  id: string
+  name: string
+  description?: string
+}
 
 const STATUS_OPTIONS = [
   { value: "available", label: "Available" },
@@ -84,9 +63,56 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const [photos, setPhotos] = useState<File[]>([])
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([])
+  const [inventoryTypes, setInventoryTypes] = useState<ProjectCategory[]>([])
+  const [houseZones, setHouseZones] = useState<ProjectCategory[]>([])
+  const [loadingCategories, setLoadingCategories] = useState(true)
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { activeProject } = useProject()
+
+  // Load project categories
+  useEffect(() => {
+    const loadCategories = async () => {
+      if (!activeProject) return
+      
+      try {
+        const supabase = createClient()
+        const { data: { session } } = await supabase.auth.getSession()
+        
+        if (!session?.access_token) return
+
+        // Load inventory types and house zones in parallel
+        const [typesResponse, zonesResponse] = await Promise.all([
+          fetch(`/api/projects/${activeProject.id}/inventory-types`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          }),
+          fetch(`/api/projects/${activeProject.id}/house-zones`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+        ])
+
+        if (typesResponse.ok) {
+          const typesData = await typesResponse.json()
+          setInventoryTypes(typesData.data || [])
+        }
+
+        if (zonesResponse.ok) {
+          const zonesData = await zonesResponse.json()
+          setHouseZones(zonesData.data || [])
+        }
+      } catch (error) {
+        console.error('Error loading project categories:', error)
+      } finally {
+        setLoadingCategories(false)
+      }
+    }
+
+    loadCategories()
+  }, [activeProject])
 
   // Initialize form with existing data in edit mode
   useEffect(() => {
@@ -430,18 +456,26 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         {/* Product Type */}
         <div className="space-y-2">
           <Label htmlFor="product_type" className="text-sm font-medium">
-            Product Type *
+            Tipo de Inventario *
           </Label>
-          <Select name="product_type" defaultValue={initialData?.product_type} required>
+          <Select name="product_type" defaultValue={initialData?.product_type} required disabled={loadingCategories}>
             <SelectTrigger className="h-11 sm:h-10">
-              <SelectValue placeholder="Select product type" />
+              <SelectValue placeholder={loadingCategories ? "Cargando tipos..." : "Seleccionar tipo"} />
             </SelectTrigger>
             <SelectContent>
-              {PRODUCT_TYPES.map((type) => (
-                <SelectItem key={type} value={type} className="py-3 sm:py-2">
-                  {type}
+              {inventoryTypes.map((type) => (
+                <SelectItem key={type.id} value={type.name} className="py-3 sm:py-2">
+                  {type.name}
+                  {type.description && (
+                    <span className="text-xs text-gray-500 ml-2">- {type.description}</span>
+                  )}
                 </SelectItem>
               ))}
+              {inventoryTypes.length === 0 && !loadingCategories && (
+                <SelectItem value="" disabled className="py-3 sm:py-2 text-gray-400">
+                  No hay tipos configurados. Configure en Acciones del Proyecto.
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>
@@ -449,18 +483,26 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         {/* House Zone */}
         <div className="space-y-2">
           <Label htmlFor="house_zone" className="text-sm font-medium">
-            House Zone *
+            Área del Proyecto *
           </Label>
-          <Select name="house_zone" defaultValue={initialData?.house_zone} required>
+          <Select name="house_zone" defaultValue={initialData?.house_zone} required disabled={loadingCategories}>
             <SelectTrigger className="h-11 sm:h-10">
-              <SelectValue placeholder="Select location" />
+              <SelectValue placeholder={loadingCategories ? "Cargando áreas..." : "Seleccionar área"} />
             </SelectTrigger>
             <SelectContent>
-              {HOUSE_ZONES.map((zone) => (
-                <SelectItem key={zone} value={zone} className="py-3 sm:py-2">
-                  {zone}
+              {houseZones.map((zone) => (
+                <SelectItem key={zone.id} value={zone.name} className="py-3 sm:py-2">
+                  {zone.name}
+                  {zone.description && (
+                    <span className="text-xs text-gray-500 ml-2">- {zone.description}</span>
+                  )}
                 </SelectItem>
               ))}
+              {houseZones.length === 0 && !loadingCategories && (
+                <SelectItem value="" disabled className="py-3 sm:py-2 text-gray-400">
+                  No hay áreas configuradas. Configure en Acciones del Proyecto.
+                </SelectItem>
+              )}
             </SelectContent>
           </Select>
         </div>

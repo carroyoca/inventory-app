@@ -111,6 +111,81 @@ export async function GET(request: NextRequest) {
 }
 
 // POST /api/projects - Crear nuevo proyecto
+export async function DELETE(request: NextRequest) {
+  try {
+    const token = request.headers.get('authorization')?.replace('Bearer ', '')
+    const { searchParams } = new URL(request.url)
+    const projectId = searchParams.get('projectId')
+
+    if (!token) {
+      return NextResponse.json(
+        { error: 'Authentication required' },
+        { status: 401 }
+      )
+    }
+
+    if (!projectId) {
+      return NextResponse.json(
+        { error: 'Project ID is required' },
+        { status: 400 }
+      )
+    }
+
+    const supabase = createServiceRoleClient()
+    
+    // Verify user authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser(token)
+    if (authError || !user) {
+      return NextResponse.json(
+        { error: 'Invalid authentication' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user is owner of the project
+    const { data: membership } = await supabase
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .eq('role', 'owner')
+      .single()
+
+    if (!membership) {
+      return NextResponse.json(
+        { error: 'Only project owners can delete projects' },
+        { status: 403 }
+      )
+    }
+
+    // Delete project (cascade will handle related data)
+    const { error: deleteError } = await supabase
+      .from('projects')
+      .delete()
+      .eq('id', projectId)
+
+    if (deleteError) {
+      console.error('Error deleting project:', deleteError)
+      return NextResponse.json(
+        { error: 'Failed to delete project' },
+        { status: 500 }
+      )
+    }
+
+    return NextResponse.json({
+      success: true,
+      message: 'Proyecto eliminado exitosamente'
+    })
+
+  } catch (error) {
+    console.error('Error in delete project API:', error)
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    )
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     console.log("=== CREATE PROJECT API START ===")

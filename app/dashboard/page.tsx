@@ -17,9 +17,14 @@ import {
   TrendingUp,
   DollarSign,
   Calendar,
-  MapPin
+  MapPin,
+  Settings,
+  X
 } from "lucide-react"
 import { RecentItems } from "@/components/recent-items"
+import { ProjectCategoriesManager } from "@/components/project-categories-manager"
+import { ProjectAnalytics } from "@/components/project-analytics"
+import { ProjectSettings } from "@/components/project-settings"
 
 interface InventoryStats {
   totalItems: number
@@ -35,6 +40,7 @@ export default function DashboardPage() {
     totalValue: 0,
     isLoading: true
   })
+  const [selectedAction, setSelectedAction] = useState<string | null>(null)
 
   useEffect(() => {
     if (activeProject) {
@@ -224,45 +230,104 @@ export default function DashboardPage() {
           </CardContent>
         </Card>
 
-        {/* Project Management Quick Access */}
+        {/* Project Actions */}
         <div className="mt-12">
-          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Gestión del Proyecto</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-                   onClick={() => router.push(`/projects/${activeProject.id}/areas`)}>
+          <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Acciones del Proyecto</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            <Card 
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+              onClick={() => setSelectedAction('categories')}
+            >
               <CardContent className="p-6 text-center">
                 <div className="p-3 bg-blue-100 rounded-xl w-fit mx-auto mb-4">
-                  <MapPin className="h-6 w-6 text-blue-600" />
+                  <Package className="h-6 w-6 text-blue-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Areas</h3>
-                <p className="text-sm text-gray-600">Gestionar zonas y habitaciones</p>
+                <h3 className="font-semibold text-gray-900 mb-2">Categorías</h3>
+                <p className="text-sm text-gray-600">Gestionar tipos y áreas</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-                   onClick={() => router.push(`/projects/${activeProject.id}/users`)}>
+            <Card 
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+              onClick={() => router.push(`/projects/${activeProject.id}/users`)}
+            >
               <CardContent className="p-6 text-center">
                 <div className="p-3 bg-green-100 rounded-xl w-fit mx-auto mb-4">
                   <Users className="h-6 w-6 text-green-600" />
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">Usuarios</h3>
-                <p className="text-sm text-gray-600">Gestionar miembros del proyecto</p>
+                <p className="text-sm text-gray-600">Gestionar miembros</p>
               </CardContent>
             </Card>
 
-            <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-                   onClick={() => router.push('/projects')}>
+            <Card 
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+              onClick={() => setSelectedAction('analytics')}
+            >
               <CardContent className="p-6 text-center">
                 <div className="p-3 bg-purple-100 rounded-xl w-fit mx-auto mb-4">
                   <BarChart3 className="h-6 w-6 text-purple-600" />
                 </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Analíticas</h3>
+                <p className="text-sm text-gray-600">Métricas del proyecto</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+              onClick={() => setSelectedAction('settings')}
+            >
+              <CardContent className="p-6 text-center">
+                <div className="p-3 bg-red-100 rounded-xl w-fit mx-auto mb-4">
+                  <Settings className="h-6 w-6 text-red-600" />
+                </div>
                 <h3 className="font-semibold text-gray-900 mb-2">Configuración</h3>
-                <p className="text-sm text-gray-600">Ajustes del proyecto</p>
+                <p className="text-sm text-gray-600">Exportar y eliminar</p>
+              </CardContent>
+            </Card>
+
+            <Card 
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
+              onClick={() => router.push('/projects')}
+            >
+              <CardContent className="p-6 text-center">
+                <div className="p-3 bg-orange-100 rounded-xl w-fit mx-auto mb-4">
+                  <FolderOpen className="h-6 w-6 text-orange-600" />
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Proyectos</h3>
+                <p className="text-sm text-gray-600">Cambiar proyecto</p>
               </CardContent>
             </Card>
           </div>
         </div>
       </main>
+      
+      {/* Action Modal */}
+      {selectedAction && (
+        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex items-center justify-between p-6 border-b">
+              <h2 className="text-xl font-bold">
+                {selectedAction === 'categories' && 'Gestión de Categorías'}
+                {selectedAction === 'analytics' && 'Analíticas del Proyecto'}
+                {selectedAction === 'settings' && 'Configuración del Proyecto'}
+              </h2>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setSelectedAction(null)}
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
+            <div className="p-6">
+              {selectedAction === 'categories' && <ProjectCategoriesManager />}
+              {selectedAction === 'analytics' && <ProjectAnalytics />}
+              {selectedAction === 'settings' && <ProjectSettings />}
+            </div>
+          </div>
+        </div>
+      )}
       </div>
     </AuthGuard>
   )
