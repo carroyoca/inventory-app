@@ -1,274 +1,159 @@
 "use client"
 
-import { useState, useEffect } from 'react'
-import { useRouter, useParams } from 'next/navigation'
-import { useProject } from '@/contexts/ProjectContext'
-import { ProjectHeader } from '@/components/project-header'
-import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-import { Badge } from '@/components/ui/badge'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { ArrowLeft, Plus, Users, Mail, Crown, Shield, User, Trash2, Loader2 } from 'lucide-react'
-import { createClient } from '@/lib/supabase/client'
-
-interface ProjectMember {
-  id: string
-  user_id: string
-  project_id: string
-  role: 'owner' | 'manager' | 'member' | 'viewer'
-  joined_at: string
-  user: {
-    email: string
-    full_name?: string
-  }
-}
+import { useState, useEffect } from "react"
+import { useParams } from "next/navigation"
+import { ProjectHeader } from "@/components/project-header"
+import { useProject } from "@/contexts/ProjectContext"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Badge } from "@/components/ui/badge"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { User, Plus, ArrowLeft, Mail, Users } from "lucide-react"
+import Link from "next/link"
+import { InvitationForm } from "@/components/invitation-form"
+import { InvitationsList } from "@/components/invitations-list"
 
 export default function ProjectUsersPage() {
-  const router = useRouter()
   const params = useParams()
-  const { activeProject, isLoading: projectLoading } = useProject()
-  const [members, setMembers] = useState<ProjectMember[]>([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [showInviteForm, setShowInviteForm] = useState(false)
-  const [inviteEmail, setInviteEmail] = useState('')
-  const [inviteRole, setInviteRole] = useState<'manager' | 'member' | 'viewer'>('member')
-  const [isInviting, setIsInviting] = useState(false)
-
-  const projectId = params.id as string
+  const { activeProject } = useProject()
+  const [members, setMembers] = useState<any[]>([])
+  const [userRole, setUserRole] = useState<string>("")
+  const [isLoading, setIsLoading] = useState(true)
+  const [activeTab, setActiveTab] = useState("members")
 
   useEffect(() => {
-    if (projectId && activeProject) {
+    if (activeProject) {
       fetchMembers()
+      fetchUserRole()
     }
-  }, [projectId, activeProject])
+  }, [activeProject])
 
   const fetchMembers = async () => {
     try {
-      setLoading(true)
-      const supabase = createClient()
-      
-      const { data, error } = await supabase
-        .from('project_members')
-        .select(`
-          id,
-          user_id,
-          project_id,
-          role,
-          joined_at,
-          user:profiles!project_members_user_id_fkey (
-            email,
-            full_name
-          )
-        `)
-        .eq('project_id', projectId)
-        .order('joined_at', { ascending: true })
+      const token = localStorage.getItem('supabase.auth.token')
+      const response = await fetch(`/api/projects/${activeProject.id}/members`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
-      if (error) {
-        throw error
+      if (response.ok) {
+        const data = await response.json()
+        setMembers(data.data || [])
       }
-
-      setMembers(data || [])
     } catch (error) {
       console.error('Error fetching members:', error)
-      setError('Failed to load project members')
     } finally {
-      setLoading(false)
+      setIsLoading(false)
     }
   }
 
-  const handleInviteUser = async (e: React.FormEvent) => {
-    e.preventDefault()
-    
-    if (!inviteEmail.trim()) {
-      alert('Email is required')
-      return
-    }
-
+  const fetchUserRole = async () => {
     try {
-      setIsInviting(true)
-      const supabase = createClient()
-      
-      // For now, we'll just show a placeholder message
-      // In Sprint 2, this will integrate with the invitation system
-      alert(`Invitation system coming in Sprint 2!\n\nEmail: ${inviteEmail}\nRole: ${inviteRole}`)
-      
-      // Reset form
-      setInviteEmail('')
-      setInviteRole('member')
-      setShowInviteForm(false)
-    } catch (error) {
-      console.error('Error inviting user:', error)
-      alert('Failed to invite user')
-    } finally {
-      setIsInviting(false)
-    }
-  }
+      const token = localStorage.getItem('supabase.auth.token')
+      const response = await fetch(`/api/projects/${activeProject.id}/members/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
 
-  const handleRemoveMember = async (memberId: string, memberEmail: string) => {
-    if (!confirm(`Are you sure you want to remove ${memberEmail} from this project?`)) {
-      return
-    }
-
-    try {
-      const supabase = createClient()
-      
-      const { error } = await supabase
-        .from('project_members')
-        .delete()
-        .eq('id', memberId)
-        .eq('project_id', projectId)
-
-      if (error) {
-        throw error
+      if (response.ok) {
+        const data = await response.json()
+        setUserRole(data.data?.role || "")
       }
-
-      await fetchMembers()
     } catch (error) {
-      console.error('Error removing member:', error)
-      alert('Failed to remove member')
+      console.error('Error fetching user role:', error)
     }
   }
 
-  const getRoleIcon = (role: string) => {
-    switch (role) {
-      case 'owner': return <Crown className="h-4 w-4 text-yellow-600" />
-      case 'manager': return <Shield className="h-4 w-4 text-blue-600" />
-      case 'member': return <User className="h-4 w-4 text-green-600" />
-      case 'viewer': return <User className="h-4 w-4 text-gray-600" />
-      default: return <User className="h-4 w-4 text-gray-600" />
-    }
+  const handleInvitationSent = () => {
+    // Refresh invitations list
+    setActiveTab("invitations")
   }
 
-  const getRoleBadgeColor = (role: string) => {
-    switch (role) {
-      case 'owner': return 'bg-yellow-100 text-yellow-800'
-      case 'manager': return 'bg-blue-100 text-blue-800'
-      case 'member': return 'bg-green-100 text-green-800'
-      case 'viewer': return 'bg-gray-100 text-gray-800'
-      default: return 'bg-gray-100 text-gray-800'
-    }
+  const handleInvitationUpdated = () => {
+    // Refresh members list when invitation is accepted
+    fetchMembers()
   }
 
-  if (projectLoading) {
-    return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
-          <p className="text-gray-600">Cargando proyecto...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!activeProject || activeProject.id !== projectId) {
-    router.push('/projects')
-    return null
+  if (!activeProject) {
+    return <div>Cargando proyecto...</div>
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-100">
       <ProjectHeader />
-      <main className="p-6">
-        {/* Header */}
+      
+      <div className="container mx-auto px-4 py-8">
         <div className="mb-6">
-          <Button 
-            variant="ghost" 
-            onClick={() => router.push(`/projects`)}
-            className="mb-4"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
+          <Link href="/projects" className="inline-flex items-center text-sm text-muted-foreground hover:text-foreground mb-4">
+            <ArrowLeft className="h-4 w-4 mr-2" />
             Volver a Proyectos
-          </Button>
-          <h1 className="text-3xl font-bold text-gray-900">Usuarios del Proyecto</h1>
-          <p className="text-gray-600 mt-2">Gestiona los miembros del proyecto "{activeProject.name}"</p>
+          </Link>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestión de Usuarios</h1>
+          <p className="text-gray-600">Administra los miembros del proyecto {activeProject.name}</p>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Members List */}
-          <div className="lg:col-span-2">
-            <Card>
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+          <TabsList className="grid w-full grid-cols-2">
+            <TabsTrigger value="members" className="flex items-center gap-2">
+              <Users className="h-4 w-4" />
+              Miembros
+            </TabsTrigger>
+            <TabsTrigger value="invitations" className="flex items-center gap-2">
+              <Mail className="h-4 w-4" />
+              Invitaciones
+            </TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="members" className="space-y-6">
+            {/* Members list */}
+            <Card className="backdrop-blur-sm bg-white/70 border-0 shadow-xl">
               <CardHeader>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-green-600" />
-                      Miembros del Proyecto
-                    </CardTitle>
-                    <CardDescription>
-                      {members.length} miembro{members.length !== 1 ? 's' : ''} en este proyecto
-                    </CardDescription>
-                  </div>
-                  <Button 
-                    onClick={() => setShowInviteForm(true)}
-                    className="flex items-center gap-2"
-                  >
-                    <Plus className="h-4 w-4" />
-                    Invitar Usuario
-                  </Button>
-                </div>
+                <CardTitle className="flex items-center gap-2">
+                  <Users className="h-5 w-5" />
+                  Miembros del Proyecto
+                </CardTitle>
+                <CardDescription>
+                  Lista de todos los usuarios que tienen acceso a este proyecto
+                </CardDescription>
               </CardHeader>
               <CardContent>
-                {loading ? (
-                  <div className="flex items-center justify-center py-8">
-                    <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
-                    <span className="ml-2 text-gray-600">Cargando miembros...</span>
-                  </div>
-                ) : error ? (
-                  <div className="text-center py-8 text-red-600">
-                    <p>{error}</p>
-                    <Button onClick={fetchMembers} variant="outline" className="mt-2">
-                      Intentar de nuevo
-                    </Button>
+                {isLoading ? (
+                  <div className="text-center py-8">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto"></div>
+                    <p className="mt-2 text-muted-foreground">Cargando miembros...</p>
                   </div>
                 ) : members.length === 0 ? (
-                  <div className="text-center py-8 text-gray-500">
-                    <Users className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-                    <h3 className="text-lg font-medium mb-2">No hay miembros en el proyecto</h3>
-                    <p className="mb-4">Invita usuarios para colaborar en este proyecto</p>
-                    <Button onClick={() => setShowInviteForm(true)}>
-                      <Plus className="h-4 w-4 mr-2" />
-                      Invitar Primer Usuario
-                    </Button>
+                  <div className="text-center py-8">
+                    <User className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+                    <p className="text-muted-foreground">No hay miembros en este proyecto</p>
                   </div>
                 ) : (
-                  <div className="space-y-3">
+                  <div className="space-y-4">
                     {members.map((member) => (
-                      <div 
-                        key={member.id} 
-                        className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50"
-                      >
-                        <div className="flex items-center space-x-3">
-                          <div className="flex items-center space-x-2">
-                            {getRoleIcon(member.role)}
-                            <div>
-                              <h4 className="font-medium text-gray-900">
-                                {member.user.full_name || 'Usuario sin nombre'}
-                              </h4>
-                              <p className="text-sm text-gray-500 flex items-center gap-1">
-                                <Mail className="h-3 w-3" />
-                                {member.user.email}
-                              </p>
-                            </div>
+                      <div key={member.id} className="flex items-center justify-between p-4 border rounded-lg bg-white/50">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-r from-purple-500 to-blue-500 rounded-full flex items-center justify-center text-white font-semibold">
+                            {member.full_name ? member.full_name.charAt(0).toUpperCase() : member.email.charAt(0).toUpperCase()}
+                          </div>
+                          <div>
+                            <p className="font-medium">{member.full_name || 'Sin nombre'}</p>
+                            <p className="text-sm text-muted-foreground">{member.email}</p>
+                            <p className="text-xs text-muted-foreground">
+                              Se unió el {new Date(member.joined_at).toLocaleDateString()}
+                            </p>
                           </div>
                         </div>
                         <div className="flex items-center gap-2">
-                          <Badge className={getRoleBadgeColor(member.role)}>
-                            {member.role}
+                          <Badge variant={member.role === 'owner' ? 'default' : 'secondary'}>
+                            {member.role === 'owner' ? 'Propietario' : 
+                             member.role === 'manager' ? 'Administrador' : 
+                             member.role === 'member' ? 'Miembro' : 'Solo Lectura'}
                           </Badge>
-                          <Badge variant="secondary">
-                            {new Date(member.joined_at).toLocaleDateString()}
-                          </Badge>
-                          {member.role !== 'owner' && (
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={() => handleRemoveMember(member.id, member.user.email)}
-                              className="text-red-600 hover:text-red-700"
-                            >
-                              <Trash2 className="h-4 w-4" />
+                          {member.role !== 'owner' && ['owner', 'manager'].includes(userRole) && (
+                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
+                              Remover
                             </Button>
                           )}
                         </div>
@@ -278,96 +163,27 @@ export default function ProjectUsersPage() {
                 )}
               </CardContent>
             </Card>
-          </div>
+          </TabsContent>
 
-          {/* Invite User Form */}
-          {showInviteForm && (
-            <div className="lg:col-span-1">
-              <Card>
-                <CardHeader>
-                  <CardTitle>Invitar Usuario</CardTitle>
-                  <CardDescription>
-                    Invita a alguien a colaborar en este proyecto
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <form onSubmit={handleInviteUser} className="space-y-4">
-                    <div className="space-y-2">
-                      <Label htmlFor="invite-email">Email del Usuario *</Label>
-                      <Input
-                        id="invite-email"
-                        type="email"
-                        value={inviteEmail}
-                        onChange={(e) => setInviteEmail(e.target.value)}
-                        placeholder="usuario@ejemplo.com"
-                        disabled={isInviting}
-                        required
-                      />
-                    </div>
-                    
-                    <div className="space-y-2">
-                      <Label htmlFor="invite-role">Rol *</Label>
-                      <Select value={inviteRole} onValueChange={(value: any) => setInviteRole(value)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="manager">
-                            <div className="flex items-center gap-2">
-                              <Shield className="h-4 w-4 text-blue-600" />
-                              Manager
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="member">
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-green-600" />
-                              Member
-                            </div>
-                          </SelectItem>
-                          <SelectItem value="viewer">
-                            <div className="flex items-center gap-2">
-                              <User className="h-4 w-4 text-gray-600" />
-                              Viewer
-                            </div>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
-                    </div>
+          <TabsContent value="invitations" className="space-y-6">
+            {/* Invitation form */}
+            {['owner', 'manager'].includes(userRole) && (
+              <InvitationForm 
+                projectId={activeProject.id} 
+                userRole={userRole}
+                onInvitationSent={handleInvitationSent}
+              />
+            )}
 
-                    <div className="flex gap-2">
-                      <Button 
-                        type="submit" 
-                        disabled={isInviting || !inviteEmail.trim()}
-                        className="flex-1"
-                      >
-                        {isInviting ? (
-                          <>
-                            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                            Invitando...
-                          </>
-                        ) : (
-                          <>
-                            <Mail className="h-4 w-4 mr-2" />
-                            Enviar Invitación
-                          </>
-                        )}
-                      </Button>
-                      <Button 
-                        type="button" 
-                        variant="outline"
-                        onClick={() => setShowInviteForm(false)}
-                        disabled={isInviting}
-                      >
-                        Cancelar
-                      </Button>
-                    </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          )}
-        </div>
-      </main>
+            {/* Invitations list */}
+            <InvitationsList 
+              projectId={activeProject.id}
+              userRole={userRole}
+              onInvitationUpdated={handleInvitationUpdated}
+            />
+          </TabsContent>
+        </Tabs>
+      </div>
     </div>
   )
 }
