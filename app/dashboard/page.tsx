@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { ProjectHeader } from '@/components/project-header'
@@ -15,10 +15,50 @@ import {
   ArrowRight,
   FolderOpen
 } from 'lucide-react'
+import { createClient } from '@/lib/supabase/client'
+import { RecentItems } from '@/components/recent-items'
 
 export default function DashboardPage() {
   const { activeProject, isLoading } = useProject()
   const router = useRouter()
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    totalValue: 0,
+    isLoading: true
+  })
+
+  // Cargar estadísticas del inventario
+  const loadInventoryStats = async () => {
+    if (!activeProject) return
+    
+    try {
+      const supabase = createClient()
+      const { data: items, error } = await supabase
+        .from('inventory_items')
+        .select('estimated_price, sale_price')
+        .eq('project_id', activeProject.id)
+
+      if (error) {
+        console.error('Error loading inventory stats:', error)
+        return
+      }
+
+      const totalItems = items?.length || 0
+      const totalValue = items?.reduce((sum, item) => {
+        const price = item.estimated_price || item.sale_price || 0
+        return sum + Number(price)
+      }, 0) || 0
+
+      setStats({
+        totalItems,
+        totalValue,
+        isLoading: false
+      })
+    } catch (error) {
+      console.error('Error loading stats:', error)
+      setStats(prev => ({ ...prev, isLoading: false }))
+    }
+  }
 
   // Si no hay proyecto activo, redirigir a selección de proyecto
   useEffect(() => {
@@ -26,6 +66,13 @@ export default function DashboardPage() {
       router.push('/select-project')
     }
   }, [activeProject, isLoading, router])
+
+  // Cargar estadísticas cuando el proyecto cambie
+  useEffect(() => {
+    if (activeProject) {
+      loadInventoryStats()
+    }
+  }, [activeProject])
 
   if (isLoading) {
     return (
@@ -70,7 +117,13 @@ export default function DashboardPage() {
               <Package className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">0</div>
+              <div className="text-2xl font-bold">
+                {stats.isLoading ? (
+                  <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                ) : (
+                  stats.totalItems
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Items en este proyecto
               </p>
@@ -83,7 +136,13 @@ export default function DashboardPage() {
               <BarChart3 className="h-4 w-4 text-muted-foreground" />
             </CardHeader>
             <CardContent>
-              <div className="text-2xl font-bold">$0</div>
+              <div className="text-2xl font-bold">
+                {stats.isLoading ? (
+                  <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
+                ) : (
+                  `$${stats.totalValue.toLocaleString()}`
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 Valor estimado del inventario
               </p>
@@ -151,6 +210,22 @@ export default function DashboardPage() {
             </CardContent>
           </Card>
         </div>
+
+        {/* Items Recientes */}
+        <Card className="mb-8">
+          <CardHeader>
+            <CardTitle className="flex items-center space-x-2">
+              <Package className="w-5 h-5 text-blue-600" />
+              <span>Items Recientes</span>
+            </CardTitle>
+            <CardDescription>
+              Los últimos items añadidos al inventario
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <RecentItems projectId={activeProject.id} />
+          </CardContent>
+        </Card>
 
         {/* Configuración del Proyecto */}
         <Card>
