@@ -84,8 +84,8 @@ export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
     return (
       <div className="flex items-center justify-center min-h-[200px]">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="mt-2 text-gray-600">Loading projects...</p>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando proyectos...</p>
         </div>
       </div>
     )
@@ -93,12 +93,12 @@ export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
 
   if (error) {
     return (
-      <Card className="w-full">
+      <Card className="w-full bg-white/80 backdrop-blur-sm border-0 shadow-lg">
         <CardContent className="pt-6">
           <div className="text-center text-red-600">
             <p className="mb-4">{error}</p>
             <Button onClick={fetchProjects} variant="outline">
-              Try Again
+              Intentar de nuevo
             </Button>
           </div>
         </CardContent>
@@ -107,76 +107,86 @@ export function ProjectsList({ onProjectSelect }: ProjectsListProps) {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900">My Projects</h2>
-          <p className="text-gray-600">Manage your inventory projects</p>
-        </div>
+    <div className="space-y-8">
+      {/* Create Project Button */}
+      <div className="flex justify-center">
         <Button 
           onClick={() => setShowCreateForm(true)}
-          className="flex items-center gap-2"
+          className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-4 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 text-lg"
         >
-          <Plus className="h-4 w-4" />
-          New Project
+          <Plus className="h-5 w-5 mr-2" />
+          Crear Nuevo Proyecto
         </Button>
       </div>
 
       {/* Create Project Form */}
       {showCreateForm && (
-        <div className="border rounded-lg p-6 bg-gray-50">
-          <ProjectForm onProjectCreated={handleProjectCreated} />
-        </div>
+        <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="p-8">
+            <ProjectForm onProjectCreated={handleProjectCreated} />
+          </CardContent>
+        </Card>
       )}
 
       {/* Projects List */}
       {projects.length === 0 ? (
-        <Card className="w-full">
-          <CardContent className="pt-6">
+        <Card className="w-full bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+          <CardContent className="pt-12 pb-12">
             <div className="text-center text-gray-600">
-              <FolderOpen className="h-12 w-12 mx-auto mb-4 text-gray-400" />
-              <h3 className="text-lg font-medium mb-2">No projects yet</h3>
-              <p className="mb-4">Create your first inventory project to get started</p>
-              <Button onClick={() => setShowCreateForm(true)}>
-                Create Your First Project
+              <div className="p-6 bg-gradient-to-br from-purple-100 to-blue-100 rounded-full w-fit mx-auto mb-6">
+                <FolderOpen className="h-12 w-12 text-purple-600" />
+              </div>
+              <h3 className="text-2xl font-bold text-gray-900 mb-3">No hay proyectos aún</h3>
+              <p className="text-gray-600 mb-6 max-w-md mx-auto">
+                Crea tu primer proyecto de inventario para comenzar
+              </p>
+              <Button 
+                onClick={() => setShowCreateForm(true)}
+                className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white px-8 py-3 rounded-xl shadow-lg hover:shadow-xl transition-all duration-300"
+              >
+                Crear Tu Primer Proyecto
               </Button>
             </div>
           </CardContent>
         </Card>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
           {projects.map((project) => (
             <Card 
               key={project.id} 
-              className="cursor-pointer hover:shadow-md transition-shadow"
+              className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer group"
               onClick={() => onProjectSelect(project)}
             >
-              <CardHeader className="pb-3">
-                <div className="flex items-start justify-between">
+              <CardContent className="p-6">
+                <div className="flex items-start justify-between mb-4">
                   <div className="flex-1">
-                    <CardTitle className="text-lg">{project.name}</CardTitle>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-lg group-hover:scale-110 transition-transform duration-300">
+                        <FolderOpen className="h-5 w-5 text-white" />
+                      </div>
+                      <h3 className="text-xl font-bold text-gray-900">{project.name}</h3>
+                    </div>
                     {project.description && (
-                      <CardDescription className="mt-1 line-clamp-2">
+                      <p className="text-gray-600 line-clamp-2 mb-4">
                         {project.description}
-                      </CardDescription>
+                      </p>
                     )}
                   </div>
-                  <Badge className={getRoleBadgeColor(
-                    project.members.find(m => m.user_id === project.created_by)?.role || 'member'
-                  )}>
+                  <Badge className={`${
+                    getRoleBadgeColor(
+                      project.members.find(m => m.user_id === project.created_by)?.role || 'member'
+                    )
+                  } text-xs font-medium`}>
                     {project.members.find(m => m.user_id === project.created_by)?.role || 'member'}
                   </Badge>
                 </div>
-              </CardHeader>
-              <CardContent className="pt-0">
                 <div className="flex items-center justify-between text-sm text-gray-600">
-                  <div className="flex items-center gap-1">
-                    <Users className="h-4 w-4" />
-                    <span>{project.member_count} member{project.member_count !== 1 ? 's' : ''}</span>
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <Users className="h-4 w-4 text-blue-600" />
+                    <span>{project.member_count} miembro{project.member_count !== 1 ? 's' : ''}</span>
                   </div>
-                  <div className="flex items-center gap-1">
-                    <Calendar className="h-4 w-4" />
+                  <div className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg">
+                    <Calendar className="h-4 w-4 text-purple-600" />
                     <span>{formatDate(project.created_at)}</span>
                   </div>
                 </div>

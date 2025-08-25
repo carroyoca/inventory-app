@@ -3,10 +3,10 @@ import { createServiceRoleClient } from '@/lib/supabase/api-client'
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const projectId = params.id
+    const { id: projectId } = await params
 
     if (!projectId) {
       return NextResponse.json(
