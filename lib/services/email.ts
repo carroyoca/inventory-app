@@ -1,7 +1,8 @@
 import { Resend } from 'resend'
 import { InvitationEmail } from '@/lib/email-templates/invitation'
 
-const resend = new Resend(process.env.RESEND_API_KEY)
+const resendApiKey = process.env.RESEND_API_KEY
+const resend = resendApiKey ? new Resend(resendApiKey) : null
 
 export async function sendInvitationEmail({
   to,
@@ -19,6 +20,12 @@ export async function sendInvitationEmail({
   invitationId: string
 }) {
   try {
+    // Check if Resend is configured
+    if (!resend) {
+      console.log('Resend not configured, skipping email send')
+      return { success: false, reason: 'Resend not configured' }
+    }
+
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
     const acceptUrl = `${baseUrl}/invitations/${invitationId}/accept`
     const rejectUrl = `${baseUrl}/invitations/${invitationId}/reject`

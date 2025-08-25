@@ -241,7 +241,7 @@ export async function POST(request: NextRequest) {
         .single()
 
       if (project && inviterProfile) {
-        await sendInvitationEmail({
+        const emailResult = await sendInvitationEmail({
           to: invitee_email,
           projectName: project.name,
           inviterName: inviterProfile.full_name || inviterProfile.email,
@@ -249,6 +249,10 @@ export async function POST(request: NextRequest) {
           role,
           invitationId: invitation.id,
         })
+        
+        if (emailResult?.success === false) {
+          console.log('Email not sent:', emailResult.reason)
+        }
       }
     } catch (emailError) {
       console.error('Error sending invitation email:', emailError)
