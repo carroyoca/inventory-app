@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/api-client'
 import { generateInvitationToken, isValidEmail } from '@/lib/utils/invitations'
+import { sendInvitationEmail } from '@/lib/services/email'
 import type { CreateInvitationData, InvitationsListResponse, InvitationResponse } from '@/lib/types/invitations'
 
 export async function GET(request: NextRequest) {
@@ -225,8 +226,34 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // TODO: Send email notification (implement in future)
-    console.log(`Invitation created for ${invitee_email} to project ${project_id}`)
+    // Send email notification
+    try {
+      const { data: project } = await supabase
+        .from('projects')
+        .select('name')
+        .eq('id', project_id)
+        .single()
+
+      const { data: inviterProfile } = await supabase
+        .from('profiles')
+        .select('full_name, email')
+        .eq('id', user.id)
+        .single()
+
+      if (project && inviterProfile) {
+        await sendInvitationEmail({
+          to: invitee_email,
+          projectName: project.name,
+          inviterName: inviterProfile.full_name || inviterProfile.email,
+          inviterEmail: inviterProfile.email,
+          role,
+          invitationId: invitation.id,
+        })
+      }
+    } catch (emailError) {
+      console.error('Error sending invitation email:', emailError)
+      // Don't fail the request if email fails, but log the error
+    }
 
     return NextResponse.json({
       success: true,
