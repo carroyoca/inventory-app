@@ -26,9 +26,16 @@ function SignUpForm() {
   useEffect(() => {
     // Get invitation email from URL if available
     const email = searchParams.get('email')
+    const invitationId = searchParams.get('invitation')
+    
     if (email) {
       setInvitationEmail(email)
       setFormData(prev => ({ ...prev, email }))
+    }
+    
+    // Store invitation ID in localStorage for later use
+    if (invitationId) {
+      localStorage.setItem('pendingInvitationId', invitationId)
     }
   }, [searchParams])
 
@@ -59,15 +66,23 @@ function SignUpForm() {
         return
       }
 
-      if (authData.user) {
-        toast({
-          title: "¡Cuenta creada exitosamente!",
-          description: "Revisa tu email para confirmar tu cuenta",
-        })
+              if (authData.user) {
+          toast({
+            title: "¡Cuenta creada exitosamente!",
+            description: "Revisa tu email para confirmar tu cuenta",
+          })
 
-        // Redirect to login page
-        router.push('/auth/login?message=account-created')
-      }
+          // Check if there's a pending invitation
+          const pendingInvitationId = localStorage.getItem('pendingInvitationId')
+          if (pendingInvitationId) {
+            localStorage.removeItem('pendingInvitationId')
+            // Redirect to invitation join page
+            router.push(`/invitations/${pendingInvitationId}/join`)
+          } else {
+            // Redirect to login page
+            router.push('/auth/login?message=account-created')
+          }
+        }
     } catch (error) {
       console.error('Error creating account:', error)
       toast({

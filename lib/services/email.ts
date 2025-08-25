@@ -35,8 +35,9 @@ export async function sendInvitationEmail({
     
     console.log('✅ Resend client available')
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-    const joinUrl = `${baseUrl}/invitations/${invitationId}/join`
+            const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+        const joinUrl = `${baseUrl}/invitations/${invitationId}/join`
+        const signupUrl = `${baseUrl}/auth/sign-up-invitation?email=${encodeURIComponent(to)}&invitation=${invitationId}`
 
     console.log('📧 Preparing email with URL:', joinUrl)
     
@@ -55,8 +56,11 @@ export async function sendInvitationEmail({
                 <p><strong>Invitado por:</strong> ${inviterName}</p>
               </div>
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${joinUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                <a href="${joinUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">
                   🚀 Unirse al Proyecto
+                </a>
+                <a href="${signupUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  📝 Crear Cuenta Nueva
                 </a>
               </div>
               <p style="font-size: 14px; color: #6b7280; text-align: center;">

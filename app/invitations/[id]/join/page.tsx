@@ -29,6 +29,25 @@ export default function JoinProjectPage() {
           return
         }
 
+        // Get invitation details to verify email match
+        const { data: invitationDetails } = await supabase
+          .from('project_invitations')
+          .select('invitee_email, status')
+          .eq('id', invitationId)
+          .single()
+
+        if (!invitationDetails) {
+          setStatus('error')
+          setMessage('Invitación no encontrada')
+          return
+        }
+
+        if (invitationDetails.status !== 'pending') {
+          setStatus('error')
+          setMessage('Esta invitación ya no está pendiente')
+          return
+        }
+
         // Verify that the user's email matches the invitation
         const { data: userProfile } = await supabase
           .from('profiles')
