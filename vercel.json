@@ -10,7 +10,7 @@
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
-          "value": "https://inventory-lazzwltqt-carlos-arroyos-projects.vercel.app"
+          "value": "https://inventoryapp-carlos-arroyos-projects.vercel.app"
         },
         {
           "key": "Access-Control-Allow-Methods",

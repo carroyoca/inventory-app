@@ -64,6 +64,24 @@ export default function JoinProjectPage() {
         console.log('🔍 User email:', userProfile?.email)
         console.log('🔍 Invitation ID:', invitationId)
 
+        // CRITICAL: Require valid profile before accepting invitation
+        if (!userProfile || !userProfile.email) {
+          console.log('❌ No valid user profile found - user must complete registration first')
+          setStatus('login-required')
+          setMessage('Debes completar tu registro antes de unirte al proyecto. Por favor, crea tu cuenta primero.')
+          return
+        }
+
+        // Verify email matches invitation
+        if (userProfile.email !== invitationDetails.invitee_email) {
+          console.log('❌ Email mismatch - cannot accept invitation')
+          setStatus('error')
+          setMessage('Esta invitación fue enviada a una dirección de correo diferente.')
+          return
+        }
+
+        console.log('✅ Profile validation passed, proceeding with invitation acceptance')
+
         // Accept the invitation automatically
         const response = await fetch(`/api/invitations/${invitationId}`, {
           method: 'PATCH',

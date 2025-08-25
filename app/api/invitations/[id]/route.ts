@@ -137,8 +137,8 @@ export async function PATCH(
       )
     }
 
-    // Verify the user is the invitee
-    const { data: userProfile } = await supabase
+    // Verify the user has a valid profile and email matches
+    const { data: userProfile, error: profileError } = await supabase
       .from('profiles')
       .select('email')
       .eq('id', user.id)
@@ -147,13 +147,24 @@ export async function PATCH(
     console.log('🔍 === ACCEPT INVITATION DEBUG ===')
     console.log('🔍 User ID:', user.id)
     console.log('🔍 User profile email:', userProfile?.email)
+    console.log('🔍 Profile error:', profileError)
     console.log('🔍 Invitation invitee_email:', invitation.invitee_email)
-    console.log('🔍 Emails match:', userProfile?.email === invitation.invitee_email)
+
+    // CRITICAL: User must have a valid profile record
+    if (!userProfile || !userProfile.email) {
+      console.log('❌ No valid user profile found - unauthorized access attempt')
+      return NextResponse.json(
+        { error: 'You must complete your account registration before accepting invitations' },
+        { status: 403 }
+      )
+    }
+
+    console.log('🔍 Emails match:', userProfile.email === invitation.invitee_email)
 
     // Strict email verification - user must have matching email
-    if (userProfile?.email !== invitation.invitee_email) {
+    if (userProfile.email !== invitation.invitee_email) {
       console.log('❌ Email mismatch - user cannot accept this invitation')
-      console.log('❌ Expected:', invitation.invitee_email, 'Got:', userProfile?.email)
+      console.log('❌ Expected:', invitation.invitee_email, 'Got:', userProfile.email)
       return NextResponse.json(
         { error: 'You can only respond to invitations sent to your email address' },
         { status: 403 }
