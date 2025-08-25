@@ -3,7 +3,8 @@
 import { useState } from "react"
 import { ProjectsList } from "@/components/projects-list"
 import { Button } from "@/components/ui/button"
-import { ArrowLeft, Plus, Check } from "lucide-react"
+import { Card, CardContent } from "@/components/ui/card"
+import { ArrowLeft, Plus, Check, MapPin, Users, Package, Settings, BarChart3, FileText } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { useProject } from "@/contexts/ProjectContext"
 import type { ProjectWithMembers } from "@/lib/types/projects"
@@ -95,7 +96,7 @@ export default function ProjectsPage() {
 
             {/* Project Actions */}
             <div className="bg-white rounded-lg shadow p-6">
-              <div className="flex items-center justify-between">
+              <div className="flex items-center justify-between mb-6">
                 <div>
                   <h3 className="text-lg font-medium text-gray-900">Project Actions</h3>
                   <p className="text-gray-600 mt-1">Manage this project and its inventory</p>
@@ -121,6 +122,105 @@ export default function ProjectsPage() {
                     Go to Dashboard
                   </Button>
                 </div>
+              </div>
+
+              {/* Project Management Grid */}
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {/* Areas Management */}
+                <Card 
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/projects/${selectedProject.id}/areas`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-blue-100 rounded-lg">
+                        <MapPin className="h-5 w-5 text-blue-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Areas</h4>
+                        <p className="text-sm text-gray-500">Manage house zones & rooms</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Users Management */}
+                <Card 
+                  className="hover:shadow-md transition-shadow cursor-pointer"
+                  onClick={() => router.push(`/projects/${selectedProject.id}/users`)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-green-100 rounded-lg">
+                        <Users className="h-5 w-5 text-green-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Users</h4>
+                        <p className="text-sm text-gray-500">Manage project members</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Inventory Types */}
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-purple-100 rounded-lg">
+                        <Package className="h-5 w-5 text-purple-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Inventory Types</h4>
+                        <p className="text-sm text-gray-500">Customize product categories</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Project Settings */}
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-gray-100 rounded-lg">
+                        <Settings className="h-5 w-5 text-gray-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Settings</h4>
+                        <p className="text-sm text-gray-500">Project configuration</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Analytics */}
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-orange-100 rounded-lg">
+                        <BarChart3 className="h-5 w-5 text-orange-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Analytics</h4>
+                        <p className="text-sm text-gray-500">Project insights & reports</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+
+                {/* Export */}
+                <Card className="hover:shadow-md transition-shadow cursor-pointer">
+                  <CardContent className="p-4">
+                    <div className="flex items-center space-x-3">
+                      <div className="p-2 bg-red-100 rounded-lg">
+                        <FileText className="h-5 w-5 text-red-600" />
+                      </div>
+                      <div className="flex-1">
+                        <h4 className="font-medium text-gray-900">Export</h4>
+                        <p className="text-sm text-gray-500">Export inventory data</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
               </div>
             </div>
           </div>
