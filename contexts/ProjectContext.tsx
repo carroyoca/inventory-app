@@ -99,15 +99,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // Cargar proyecto activo solo una vez al montar
   useEffect(() => {
     console.log('🔄 ProjectContext: Initial useEffect triggered')
-    console.log('🔄 ProjectContext: Component mounted, calling getActiveProject')
-    
-    // Usar setTimeout para asegurar que el componente esté completamente montado
-    const timer = setTimeout(() => {
-      console.log('🔄 ProjectContext: Timer fired, calling getActiveProject')
-      getActiveProject()
-    }, 100)
-
-    return () => clearTimeout(timer)
+    getActiveProject()
   }, [])
 
   console.log('🔄 ProjectContext: Rendering with state:', { activeProject: !!activeProject, isLoading })
