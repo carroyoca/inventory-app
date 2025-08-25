@@ -9,6 +9,7 @@ interface ProjectContextType {
   setActiveProject: (project: Project | null) => void
   isLoading: boolean
   refreshActiveProject: () => Promise<void>
+  clearProjectState: () => void
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -96,10 +97,39 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     await getActiveProject()
   }
 
-  // Cargar proyecto activo solo una vez al montar
+  // Función para limpiar el estado (útil para logout)
+  const clearProjectState = () => {
+    console.log('🔄 ProjectContext: clearProjectState called')
+    setActiveProject(null)
+    setIsLoading(false)
+  }
+
+  // Cargar proyecto activo y escuchar cambios de autenticación
   useEffect(() => {
     console.log('🔄 ProjectContext: Initial useEffect triggered')
     getActiveProject()
+
+    // Listen to auth changes
+    const supabase = createClient()
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      (event, session) => {
+        console.log('🔄 ProjectContext: Auth state changed:', event, !!session?.user)
+        
+        if (event === 'SIGNED_OUT') {
+          console.log('🔄 ProjectContext: User signed out, clearing state')
+          setActiveProject(null)
+          setIsLoading(false)
+        } else if (event === 'SIGNED_IN' && session?.user) {
+          console.log('🔄 ProjectContext: User signed in, refreshing project')
+          getActiveProject()
+        }
+      }
+    )
+
+    return () => {
+      console.log('🔄 ProjectContext: Cleaning up auth listener')
+      subscription.unsubscribe()
+    }
   }, [])
 
   console.log('🔄 ProjectContext: Rendering with state:', { activeProject: !!activeProject, isLoading })
@@ -108,7 +138,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     activeProject,
     setActiveProject,
     isLoading,
-    refreshActiveProject
+    refreshActiveProject,
+    clearProjectState
   }
 
   return (

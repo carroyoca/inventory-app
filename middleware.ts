@@ -56,20 +56,29 @@ export async function middleware(request: NextRequest) {
       // Routes that require an active project
       const projectRequiredRoutes = ['/dashboard', '/inventory']
       
-      // Routes that are always accessible
-      const alwaysAccessibleRoutes = ['/projects', '/select-project', '/auth']
+      // Routes that are always accessible for authenticated users
+      const alwaysAccessibleRoutes = ['/projects', '/select-project', '/auth', '/']
       
-      if (projectRequiredRoutes.some(route => pathname.startsWith(route))) {
-        // Check if user has any projects
-        const { data: projects, error } = await supabase
-          .from('project_members')
-          .select('project_id')
-          .eq('user_id', user.id)
-          .limit(1)
-        
-        if (!error && projects && projects.length === 0) {
-          // User has no projects, redirect to project selection
-          if (pathname !== '/select-project') {
+      // Skip project check for always accessible routes
+      if (!alwaysAccessibleRoutes.some(route => pathname === route || pathname.startsWith(route))) {
+        if (projectRequiredRoutes.some(route => pathname.startsWith(route))) {
+          // Check if user has any projects
+          const { data: projects, error } = await supabase
+            .from('project_members')
+            .select('project_id')
+            .eq('user_id', user.id)
+            .limit(1)
+          
+          if (error) {
+            console.error('Middleware project check error:', error)
+            // If there's an error checking projects, redirect to project selection
+            const url = request.nextUrl.clone()
+            url.pathname = "/select-project"
+            return NextResponse.redirect(url)
+          }
+          
+          if (!projects || projects.length === 0) {
+            // User has no projects, redirect to project selection
             const url = request.nextUrl.clone()
             url.pathname = "/select-project"
             return NextResponse.redirect(url)

@@ -11,7 +11,20 @@ export default async function HomePage() {
   } = await supabase.auth.getUser()
 
   if (user) {
-    redirect("/dashboard")
+    // Check if user has any projects
+    const { data: projects, error } = await supabase
+      .from('project_members')
+      .select('project_id')
+      .eq('user_id', user.id)
+      .limit(1)
+    
+    if (!error && projects && projects.length > 0) {
+      // User has projects, redirect to dashboard
+      redirect("/dashboard")
+    } else {
+      // User has no projects, redirect to project selection
+      redirect("/select-project")
+    }
   }
 
   return (

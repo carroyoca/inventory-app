@@ -22,7 +22,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 
 export function ProjectHeader() {
-  const { activeProject, setActiveProject, refreshActiveProject } = useProject()
+  const { activeProject, setActiveProject, refreshActiveProject, clearProjectState } = useProject()
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
   const supabase = createClient()
@@ -30,9 +30,14 @@ export function ProjectHeader() {
   const handleSignOut = async () => {
     setIsLoading(true)
     try {
+      // Clear the project state first
+      clearProjectState()
+      // Sign out from Supabase
       await supabase.auth.signOut()
-      setActiveProject(null)
+      // Redirect to home page
       router.push('/')
+      // Force a page reload to clear any cached state
+      window.location.href = '/'
     } catch (error) {
       console.error('Error signing out:', error)
     } finally {
