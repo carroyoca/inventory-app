@@ -89,11 +89,19 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
 
   const handleAcceptInvitation = async (invitationId: string) => {
     try {
+      console.log('🔍 === ACCEPT INVITATION START ===')
+      console.log('🔍 Invitation ID:', invitationId)
+      
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       const token = session?.access_token
       
+      console.log('🔍 Session exists:', !!session)
+      console.log('🔍 Token exists:', !!token)
+      console.log('🔍 Token preview:', token ? token.substring(0, 20) + '...' : 'No token')
+      
       if (!token) {
+        console.log('❌ No authentication token found')
         toast({
           title: "Error",
           description: "No se pudo obtener el token de autenticación",
@@ -102,6 +110,8 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
         return
       }
 
+      console.log('🔍 Making PATCH request to:', `/api/invitations/${invitationId}`)
+      
       const response = await fetch(`/api/invitations/${invitationId}`, {
         method: 'PATCH',
         headers: {
@@ -111,9 +121,14 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
         body: JSON.stringify({ status: 'accepted' })
       })
 
+      console.log('🔍 Response status:', response.status)
+      console.log('🔍 Response headers:', Object.fromEntries(response.headers.entries()))
+
       const data = await response.json()
+      console.log('🔍 Response data:', data)
 
       if (response.ok) {
+        console.log('✅ Invitation accepted successfully')
         toast({
           title: "¡Invitación aceptada!",
           description: "Ya puedes acceder al proyecto",
@@ -121,6 +136,7 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
         fetchInvitations()
         onInvitationUpdated?.()
       } else {
+        console.log('❌ Error accepting invitation:', data.error)
         toast({
           title: "Error",
           description: data.error || "Error al aceptar la invitación",
@@ -128,13 +144,14 @@ export function InvitationsList({ projectId, userRole, onInvitationUpdated }: In
         })
       }
     } catch (error) {
-      console.error('Error accepting invitation:', error)
+      console.error('❌ Error accepting invitation:', error)
       toast({
         title: "Error",
         description: "Error de conexión",
         variant: "destructive"
       })
     }
+    console.log('🔍 === ACCEPT INVITATION END ===')
   }
 
 
