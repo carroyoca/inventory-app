@@ -110,8 +110,11 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('📧 === CREATE INVITATION API START ===')
+    
     const token = request.headers.get('authorization')?.replace('Bearer ', '')
     if (!token) {
+      console.log('❌ No authentication token provided')
       return NextResponse.json(
         { error: 'Authentication required' },
         { status: 401 }
@@ -123,14 +126,19 @@ export async function POST(request: NextRequest) {
     // Verify user authentication
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
     if (authError || !user) {
+      console.log('❌ Authentication failed:', authError)
       return NextResponse.json(
         { error: 'Invalid authentication' },
         { status: 401 }
       )
     }
 
+    console.log('✅ User authenticated:', user.id)
+
     const body: CreateInvitationData = await request.json()
     const { project_id, invitee_email, role } = body
+    
+    console.log('📧 Invitation request:', { project_id, invitee_email, role })
 
     // Validate required fields
     if (!project_id || !invitee_email || !role) {
@@ -178,28 +186,45 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if invitation already exists
-    const { data: existingInvitation } = await supabase
-      .from('project_invitations')
-      .select('id, status')
-      .eq('project_id', project_id)
-      .eq('invitee_email', invitee_email)
-      .in('status', ['pending', 'accepted'])
-      .single()
+            // Check if invitation already exists
+        const { data: existingInvitations, error: checkError } = await supabase
+          .from('project_invitations')
+          .select('id, status')
+          .eq('project_id', project_id)
+          .eq('invitee_email', invitee_email)
 
-    if (existingInvitation) {
-      if (existingInvitation.status === 'pending') {
-        return NextResponse.json(
-          { error: 'An invitation is already pending for this user' },
-          { status: 409 }
-        )
-      } else if (existingInvitation.status === 'accepted') {
-        return NextResponse.json(
-          { error: 'User is already a member of this project' },
-          { status: 409 }
-        )
-      }
-    }
+        if (checkError) {
+          console.error('Error checking existing invitations:', checkError)
+          return NextResponse.json(
+            { error: 'Failed to check existing invitations' },
+            { status: 500 }
+          )
+        }
+
+        if (existingInvitations && existingInvitations.length > 0) {
+          const existingInvitation = existingInvitations[0]
+          
+          if (existingInvitation.status === 'pending') {
+            console.log('❌ Invitation already pending for:', invitee_email)
+            return NextResponse.json(
+              { error: 'Ya existe una invitación pendiente para este usuario' },
+              { status: 409 }
+            )
+          } else if (existingInvitation.status === 'accepted') {
+            console.log('❌ User already member:', invitee_email)
+            return NextResponse.json(
+              { error: 'El usuario ya es miembro de este proyecto' },
+              { status: 409 }
+            )
+          } else if (existingInvitation.status === 'rejected') {
+            console.log('🔄 User previously rejected, creating new invitation')
+            // Delete the rejected invitation and create a new one
+            await supabase
+              .from('project_invitations')
+              .delete()
+              .eq('id', existingInvitation.id)
+          }
+        }
 
     // Generate invitation token
     const invitationToken = generateInvitationToken()
@@ -267,11 +292,13 @@ export async function POST(request: NextRequest) {
       // Don't fail the request if email fails, but log the error
     }
 
-    return NextResponse.json({
-      success: true,
-      data: invitation,
-      message: 'Invitation sent successfully'
-    } as InvitationResponse)
+            console.log('✅ Invitation created successfully:', invitation.id)
+        
+        return NextResponse.json({
+          success: true,
+          data: invitation,
+          message: 'Invitation sent successfully'
+        } as InvitationResponse)
 
   } catch (error) {
     console.error('Error in create invitation API:', error)

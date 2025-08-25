@@ -83,21 +83,32 @@ export function InvitationForm({ projectId, userRole, onInvitationSent }: Invita
 
       const data = await response.json()
 
-      if (response.ok) {
-        toast({
-          title: "¡Invitación enviada!",
-          description: `Se ha enviado una invitación a ${email}`,
-        })
-        setEmail("")
-        setRole("member")
-        onInvitationSent?.()
-      } else {
-        toast({
-          title: "Error",
-          description: data.error || "Error al enviar la invitación",
-          variant: "destructive"
-        })
-      }
+                if (response.ok) {
+            toast({
+              title: "¡Invitación enviada!",
+              description: `Se ha enviado una invitación a ${email}`,
+            })
+            setEmail("")
+            setRole("member")
+            onInvitationSent?.()
+          } else {
+            let errorMessage = data.error || "Error al enviar la invitación"
+            
+            // Handle specific error cases
+            if (response.status === 409) {
+              if (data.error?.includes('pendiente')) {
+                errorMessage = "Ya existe una invitación pendiente para este email"
+              } else if (data.error?.includes('miembro')) {
+                errorMessage = "Este usuario ya es miembro del proyecto"
+              }
+            }
+            
+            toast({
+              title: "Error",
+              description: errorMessage,
+              variant: "destructive"
+            })
+          }
     } catch (error) {
       console.error('Error sending invitation:', error)
       toast({
