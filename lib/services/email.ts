@@ -41,7 +41,7 @@ export async function sendInvitationEmail({
     console.log('📧 Preparing email with URL:', joinUrl)
     
     const { data, error } = await resend.emails.send({
-      from: 'Art Inventory <noreply@artinventory.com>',
+      from: 'Art Inventory <onboarding@resend.dev>',
       to: [to],
       subject: `Invitación para unirse al proyecto ${projectName}`,
       react: InvitationEmail({

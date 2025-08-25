@@ -28,7 +28,7 @@ export async function GET(request: NextRequest) {
     // Test a simple email (optional)
     try {
       const { data, error } = await resend.emails.send({
-        from: 'Art Inventory <noreply@artinventory.com>',
+        from: 'Art Inventory <onboarding@resend.dev>',
         to: ['test@example.com'],
         subject: 'Test Email from Art Inventory',
         html: '<p>This is a test email to verify Resend configuration.</p>'
