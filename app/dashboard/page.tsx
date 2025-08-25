@@ -25,6 +25,7 @@ import { RecentItems } from "@/components/recent-items"
 import { ProjectCategoriesManager } from "@/components/project-categories-manager"
 import { ProjectAnalytics } from "@/components/project-analytics"
 import { ProjectSettings } from "@/components/project-settings"
+import { createClient } from "@/lib/supabase/client"
 
 interface InventoryStats {
   totalItems: number
@@ -52,17 +53,41 @@ export default function DashboardPage() {
     if (!activeProject) return
 
     try {
-      const response = await fetch(`/api/projects/${activeProject.id}/stats`)
+      // Get the session token for authentication
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.error('No access token available for stats fetch')
+        setStats(prev => ({ ...prev, isLoading: false }))
+        return
+      }
+
+      console.log('📊 Fetching stats for project:', activeProject.id)
+      const response = await fetch(`/api/projects/${activeProject.id}/stats`, {
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
+      })
+
+      console.log('📊 Stats response status:', response.status)
+      
       if (response.ok) {
         const data = await response.json()
+        console.log('📊 Stats data received:', data)
         setStats({
           totalItems: data.totalItems || 0,
           totalValue: data.totalValue || 0,
           isLoading: false
         })
+      } else {
+        console.error('📊 Stats fetch failed:', response.status, response.statusText)
+        const errorData = await response.text()
+        console.error('📊 Error details:', errorData)
+        setStats(prev => ({ ...prev, isLoading: false }))
       }
     } catch (error) {
-      console.error('Error fetching stats:', error)
+      console.error('📊 Error fetching stats:', error)
       setStats(prev => ({ ...prev, isLoading: false }))
     }
   }
