@@ -4,15 +4,16 @@ import { useEffect, useState } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
-import { Check, Loader2, AlertCircle, LogIn } from "lucide-react"
+import { Check, Loader2, AlertCircle, LogIn, UserX } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 
 export default function JoinProjectPage() {
   const params = useParams()
   const router = useRouter()
-  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'login-required'>('loading')
+  const [status, setStatus] = useState<'loading' | 'success' | 'error' | 'login-required' | 'registration-required'>('loading')
   const [message, setMessage] = useState('')
   const [projectName, setProjectName] = useState('')
+  const [invitationEmail, setInvitationEmail] = useState('')
 
   useEffect(() => {
     const joinProject = async () => {
@@ -29,7 +30,7 @@ export default function JoinProjectPage() {
         if (!session?.user) {
           console.log('❌ No authenticated user found')
           setStatus('login-required')
-          setMessage('Debes iniciar sesión para unirte al proyecto. Si no tienes cuenta, puedes crear una nueva.')
+          setMessage('Debes iniciar sesión para unirte al proyecto. Si no tienes cuenta, debes crear una nueva.')
           return
         }
 
@@ -38,7 +39,7 @@ export default function JoinProjectPage() {
         // Get invitation details to verify email match
         const { data: invitationDetails } = await supabase
           .from('project_invitations')
-          .select('invitee_email, status')
+          .select('invitee_email, status, project_id')
           .eq('id', invitationId)
           .single()
 
@@ -54,29 +55,43 @@ export default function JoinProjectPage() {
           return
         }
 
-        // Verify that the user's email matches the invitation
-        const { data: userProfile } = await supabase
+        // Store invitation email for display
+        setInvitationEmail(invitationDetails.invitee_email)
+
+        // CRITICAL: Get complete user profile to verify registration is complete
+        const { data: userProfile, error: profileError } = await supabase
           .from('profiles')
-          .select('email')
+          .select('id, email, full_name, created_at, updated_at')
           .eq('id', session.user.id)
           .single()
 
-        console.log('🔍 User email:', userProfile?.email)
-        console.log('🔍 Invitation ID:', invitationId)
+        console.log('🔍 User profile check:', !!userProfile)
+        console.log('🔍 Profile error:', profileError)
 
-        // CRITICAL: Require valid profile before accepting invitation
-        if (!userProfile || !userProfile.email) {
+        // STRICT CHECK: Require complete user profile
+        if (!userProfile || profileError) {
           console.log('❌ No valid user profile found - user must complete registration first')
-          setStatus('login-required')
-          setMessage('Debes completar tu registro antes de unirte al proyecto. Por favor, crea tu cuenta primero.')
+          setStatus('registration-required')
+          setMessage('Tu cuenta no está completamente registrada. Debes completar tu perfil antes de unirte al proyecto.')
           return
         }
 
-        // Verify email matches invitation
-        if (userProfile.email !== invitationDetails.invitee_email) {
+        // Additional check: ensure profile has required fields
+        if (!userProfile.email || !userProfile.full_name) {
+          console.log('❌ Incomplete profile - missing email or full_name')
+          setStatus('registration-required')
+          setMessage('Tu perfil está incompleto. Debes completar tu información personal antes de unirte al proyecto.')
+          return
+        }
+
+        console.log('🔍 User email:', userProfile.email)
+        console.log('🔍 Invitation email:', invitationDetails.invitee_email)
+
+        // Verify email matches invitation exactly
+        if (userProfile.email.toLowerCase() !== invitationDetails.invitee_email.toLowerCase()) {
           console.log('❌ Email mismatch - cannot accept invitation')
           setStatus('error')
-          setMessage('Esta invitación fue enviada a una dirección de correo diferente.')
+          setMessage(`Esta invitación fue enviada a ${invitationDetails.invitee_email}, pero tu cuenta está registrada con ${userProfile.email}.`)
           return
         }
 
@@ -130,12 +145,14 @@ export default function JoinProjectPage() {
             {status === 'success' && '¡Bienvenido!'}
             {status === 'error' && 'Error'}
             {status === 'login-required' && 'Inicio de Sesión Requerido'}
+            {status === 'registration-required' && 'Registro Incompleto'}
           </CardTitle>
           <CardDescription>
             {status === 'loading' && 'Estamos procesando tu invitación'}
             {status === 'success' && `Ya eres parte de ${projectName || 'el proyecto'}`}
             {status === 'error' && 'No se pudo procesar la invitación'}
             {status === 'login-required' && 'Necesitas iniciar sesión para continuar'}
+            {status === 'registration-required' && 'Debes completar tu registro'}
           </CardDescription>
         </CardHeader>
         <CardContent className="text-center space-y-4">
@@ -163,7 +180,20 @@ export default function JoinProjectPage() {
             </div>
           )}
           
+          {status === 'registration-required' && (
+            <div className="flex justify-center">
+              <UserX className="h-8 w-8 text-red-600" />
+            </div>
+          )}
+          
           <p className="text-gray-600">{message}</p>
+          
+          {invitationEmail && (status === 'login-required' || status === 'registration-required') && (
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3 text-sm">
+              <p className="font-medium text-yellow-800">Invitación enviada a:</p>
+              <p className="text-yellow-700">{invitationEmail}</p>
+            </div>
+          )}
           
           <div className="flex gap-2 justify-center">
             {status === 'login-required' && (
@@ -173,6 +203,17 @@ export default function JoinProjectPage() {
                 </Button>
                 <Button variant="outline" onClick={() => router.push('/auth/sign-up-invitation')}>
                   Crear Cuenta
+                </Button>
+              </>
+            )}
+            
+            {status === 'registration-required' && (
+              <>
+                <Button onClick={() => router.push('/profile')}>
+                  Completar Perfil
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/auth/login')}>
+                  Ir a Iniciar Sesión
                 </Button>
               </>
             )}

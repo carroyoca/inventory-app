@@ -55,16 +55,33 @@ export async function sendInvitationEmail({
                 <p><strong>Rol asignado:</strong> ${role === 'owner' ? 'Propietario' : role === 'manager' ? 'Administrador' : role === 'member' ? 'Miembro' : 'Solo Lectura'}</p>
                 <p><strong>Invitado por:</strong> ${inviterName}</p>
               </div>
+              
+              <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h3 style="color: #d97706; margin-top: 0;">⚠️ IMPORTANTE: Debes crear una cuenta primero</h3>
+                <p style="margin-bottom: 10px;"><strong>Antes de unirte al proyecto, necesitas crear una cuenta en Art Inventory.</strong></p>
+                <p style="margin-bottom: 0;">Si ya tienes una cuenta, simplemente inicia sesión y luego haz clic en "Unirse al Proyecto".</p>
+              </div>
+              
               <div style="text-align: center; margin: 30px 0;">
-                <a href="${joinUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">
-                  🚀 Unirse al Proyecto
-                </a>
-                <a href="${signupUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                <a href="${signupUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">
                   📝 Crear Cuenta Nueva
                 </a>
+                <a href="${joinUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+                  🚀 Unirse al Proyecto
+                </a>
               </div>
+              
+              <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+                <h4 style="margin-top: 0;">📋 Pasos para unirte al proyecto:</h4>
+                <ol style="margin: 0; padding-left: 20px;">
+                  <li><strong>Crear cuenta:</strong> Si no tienes una cuenta, haz clic en "Crear Cuenta Nueva"</li>
+                  <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en Art Inventory</li>
+                  <li><strong>Unirse al proyecto:</strong> Una vez autenticado, haz clic en "Unirse al Proyecto"</li>
+                </ol>
+              </div>
+              
               <p style="font-size: 14px; color: #6b7280; text-align: center;">
-                Haz clic en "Unirse al Proyecto" para acceder inmediatamente. Esta invitación expira en 7 días.
+                Esta invitación expira en 7 días. No podrás acceder al proyecto sin crear una cuenta primero.
               </p>
             </div>
           `,

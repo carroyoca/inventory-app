@@ -46,7 +46,7 @@ export async function middleware(request: NextRequest) {
     const publicRoutes = ["/", "/auth/login", "/auth/sign-up", "/auth/sign-up-invitation", "/auth/callback", "/auth/auth-code-error", "/auth/sign-up-success"]
     const isPublicRoute = publicRoutes.some(route => request.nextUrl.pathname === route || request.nextUrl.pathname.startsWith(route))
     
-    // Special handling for invitation pages - they require authentication
+    // Special handling for invitation pages - they require complete authentication
     const isInvitationRoute = request.nextUrl.pathname.startsWith('/invitations/')
     
     console.log('🔍 Route analysis:', {
@@ -56,24 +56,27 @@ export async function middleware(request: NextRequest) {
       hasUser: !!user
     })
     
+    // For invitation routes, enforce strict authentication
+    if (isInvitationRoute) {
+      if (!user) {
+        console.log('🚫 Blocking unauthenticated access to invitation route:', request.nextUrl.pathname)
+        const url = request.nextUrl.clone()
+        url.pathname = "/auth/login"
+        url.searchParams.set('redirectTo', request.nextUrl.pathname)
+        return NextResponse.redirect(url)
+      }
+      
+      // For authenticated users on invitation routes, we'll let the page handle profile validation
+      // The page will check if the user has a complete profile and redirect accordingly
+      console.log('✅ Authenticated user accessing invitation route:', request.nextUrl.pathname)
+      return supabaseResponse
+    }
+    
     // Redirect unauthenticated users to login (except for public routes)
     if (!user && !isPublicRoute) {
       console.log('🚫 Redirecting unauthenticated user from:', request.nextUrl.pathname)
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
-      // For invitation routes, preserve the original URL to redirect back after login
-      if (isInvitationRoute) {
-        url.searchParams.set('redirectTo', request.nextUrl.pathname)
-      }
-      return NextResponse.redirect(url)
-    }
-    
-    // For invitation routes, ensure user is authenticated
-    if (isInvitationRoute && !user) {
-      console.log('🚫 Blocking unauthenticated access to invitation route:', request.nextUrl.pathname)
-      const url = request.nextUrl.clone()
-      url.pathname = "/auth/login"
-      url.searchParams.set('redirectTo', request.nextUrl.pathname)
       return NextResponse.redirect(url)
     }
 
