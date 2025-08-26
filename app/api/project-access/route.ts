@@ -215,12 +215,13 @@ export async function POST(request: NextRequest) {
         member
       })
     } else {
-      // User doesn't exist yet, store the access request for when they sign up
-      // For now, we'll just return success and the user will be added when they sign up
+      // User doesn't exist yet - for now, we'll just return success
+      // The user will need to sign up first, then we can add them
       return NextResponse.json({
         success: true,
-        message: 'Access granted. User will be added to project when they sign up.',
-        pending: true
+        message: `Access granted for ${user_email}. The user will be added to the project when they sign up with this email address.`,
+        pending: true,
+        email: user_email
       })
     }
 

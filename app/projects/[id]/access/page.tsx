@@ -9,7 +9,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useToast } from "@/hooks/use-toast"
-import { ArrowLeft, Plus, Mail, Trash2, UserPlus } from "lucide-react"
+import { ArrowLeft, Plus, Mail, Trash2, UserPlus, Clock } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
 
 interface ProjectAccess {
@@ -143,10 +143,19 @@ export default function ProjectAccessPage() {
         throw new Error(result.error || 'Failed to grant access')
       }
 
-      toast({
-        title: "Success",
-        description: result.message || "Access granted successfully"
-      })
+      if (result.pending) {
+        // User doesn't exist yet - show special message
+        toast({
+          title: "Access Granted (Pending)",
+          description: result.message || "The user will be added when they sign up with this email.",
+          variant: "default"
+        })
+      } else {
+        toast({
+          title: "Success",
+          description: result.message || "Access granted successfully"
+        })
+      }
 
       // Reset form and reload data
       setNewAccess({ email: "", role: "member" })
@@ -414,6 +423,26 @@ export default function ProjectAccessPage() {
                 ))}
               </div>
             )}
+          </CardContent>
+        </Card>
+
+        {/* Pending Access Section */}
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Clock className="h-5 w-5" />
+              Acceso Pendiente
+            </CardTitle>
+            <CardDescription>
+              Usuarios que tienen acceso concedido pero aún no se han registrado
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+              <p>No hay acceso pendiente</p>
+              <p className="text-sm">Cuando concedas acceso a un usuario que no existe, aparecerá aquí</p>
+            </div>
           </CardContent>
         </Card>
       </div>
