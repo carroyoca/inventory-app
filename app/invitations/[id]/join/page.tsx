@@ -91,7 +91,7 @@ export default function JoinProjectPage() {
         if (userProfile.email.toLowerCase() !== invitationDetails.invitee_email.toLowerCase()) {
           console.log('❌ Email mismatch - cannot accept invitation')
           setStatus('error')
-          setMessage(`Esta invitación fue enviada a ${invitationDetails.invitee_email}, pero tu cuenta está registrada con ${userProfile.email}.`)
+          setMessage(`Esta invitación fue enviada a ${invitationDetails.invitee_email}, pero tu cuenta está registrada con ${userProfile.email}. Debes crear una cuenta con el email correcto para unirte al proyecto.`)
           return
         }
 
@@ -124,12 +124,12 @@ export default function JoinProjectPage() {
           }, 2000)
         } else {
           setStatus('error')
-          setMessage(data.error || 'Error al unirse al proyecto')
+          setMessage(data.error || 'Error al unirse al proyecto. Debes crear una cuenta válida para acceder al sistema.')
         }
       } catch (error) {
         console.error('Error joining project:', error)
         setStatus('error')
-        setMessage('Error de conexión')
+        setMessage('Error de conexión. Debes crear una cuenta válida para acceder al sistema.')
       }
     }
 
@@ -169,9 +169,20 @@ export default function JoinProjectPage() {
           )}
           
           {status === 'error' && (
-            <div className="flex justify-center">
-              <AlertCircle className="h-8 w-8 text-red-600" />
-            </div>
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <h3 className="text-red-800 font-medium mb-2">⚠️ Acceso Restringido</h3>
+                <p className="text-red-700 text-sm">
+                  No puedes acceder al sistema sin una cuenta válida. Debes crear una cuenta primero.
+                </p>
+              </div>
+              <Button onClick={() => router.push('/auth/sign-up-invitation')}>
+                Crear Cuenta
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/auth/login')}>
+                Iniciar Sesión
+              </Button>
+            </>
           )}
           
           {status === 'login-required' && (
@@ -195,41 +206,35 @@ export default function JoinProjectPage() {
             </div>
           )}
           
-          <div className="flex gap-2 justify-center">
-            {status === 'login-required' && (
-              <>
-                <Button onClick={() => router.push('/auth/login')}>
-                  Iniciar Sesión
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/auth/sign-up-invitation')}>
-                  Crear Cuenta
-                </Button>
-              </>
-            )}
-            
-            {status === 'registration-required' && (
-              <>
-                <Button onClick={() => router.push('/profile')}>
-                  Completar Perfil
-                </Button>
-                <Button variant="outline" onClick={() => router.push('/auth/login')}>
-                  Ir a Iniciar Sesión
-                </Button>
-              </>
-            )}
-            
-            {status === 'success' && (
+          {status === 'login-required' && (
+            <div className="flex gap-2 justify-center">
+              <Button onClick={() => router.push('/auth/login')}>
+                Iniciar Sesión
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/auth/sign-up-invitation')}>
+                Crear Cuenta
+              </Button>
+            </div>
+          )}
+          
+          {status === 'registration-required' && (
+            <div className="flex gap-2 justify-center">
+              <Button onClick={() => router.push('/profile')}>
+                Completar Perfil
+              </Button>
+              <Button variant="outline" onClick={() => router.push('/auth/login')}>
+                Ir a Iniciar Sesión
+              </Button>
+            </div>
+          )}
+          
+          {status === 'success' && (
+            <div className="flex gap-2 justify-center">
               <Button onClick={() => router.push('/dashboard')}>
                 Ir al Dashboard
               </Button>
-            )}
-            
-            {status === 'error' && (
-              <Button onClick={() => router.push('/auth/login')}>
-                Ir a Iniciar Sesión
-              </Button>
-            )}
-          </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>

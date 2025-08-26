@@ -72,6 +72,24 @@ export async function middleware(request: NextRequest) {
       return supabaseResponse
     }
     
+    // CRITICAL: For all other protected routes, ensure user has complete profile
+    if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith("/auth")) {
+      // Check if user has a complete profile
+      const { data: userProfile } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('id', user.id)
+        .single()
+      
+      // If user doesn't have a complete profile, redirect to profile completion
+      if (!userProfile || !userProfile.email || !userProfile.full_name) {
+        console.log('🚫 User with incomplete profile trying to access:', request.nextUrl.pathname)
+        const url = request.nextUrl.clone()
+        url.pathname = "/profile"
+        return NextResponse.redirect(url)
+      }
+    }
+    
     // Redirect unauthenticated users to login (except for public routes)
     if (!user && !isPublicRoute) {
       console.log('🚫 Redirecting unauthenticated user from:', request.nextUrl.pathname)
