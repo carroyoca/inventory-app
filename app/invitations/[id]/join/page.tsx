@@ -36,6 +36,41 @@ export default function JoinProjectPage() {
 
         console.log('✅ User authenticated:', session.user.id)
 
+        // IMMEDIATE PROFILE CHECK: Verify user has a complete profile before proceeding
+        const { data: userProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id, email, full_name, created_at, updated_at')
+          .eq('id', session.user.id)
+          .single()
+
+        console.log('🔍 Immediate profile check:', !!userProfile)
+        console.log('🔍 Profile error:', profileError)
+
+        // CRITICAL: If no profile exists, user must create account first
+        if (!userProfile || profileError) {
+          console.log('❌ No valid user profile found - user must create account first')
+          
+          // Clear any invalid session to prevent access to protected areas
+          try {
+            await supabase.auth.signOut()
+            console.log('🔒 Cleared invalid session')
+          } catch (signOutError) {
+            console.log('⚠️ Error clearing session:', signOutError)
+          }
+          
+          setStatus('registration-required')
+          setMessage('No tienes una cuenta válida. Debes crear una cuenta antes de unirte al proyecto.')
+          return
+        }
+
+        // Additional check: ensure profile has required fields
+        if (!userProfile.email || !userProfile.full_name) {
+          console.log('❌ Incomplete profile - missing email or full_name')
+          setStatus('registration-required')
+          setMessage('Tu perfil está incompleto. Debes completar tu información personal antes de unirte al proyecto.')
+          return
+        }
+
         // Get invitation details to verify email match
         const { data: invitationDetails } = await supabase
           .from('project_invitations')
@@ -57,32 +92,6 @@ export default function JoinProjectPage() {
 
         // Store invitation email for display
         setInvitationEmail(invitationDetails.invitee_email)
-
-        // CRITICAL: Get complete user profile to verify registration is complete
-        const { data: userProfile, error: profileError } = await supabase
-          .from('profiles')
-          .select('id, email, full_name, created_at, updated_at')
-          .eq('id', session.user.id)
-          .single()
-
-        console.log('🔍 User profile check:', !!userProfile)
-        console.log('🔍 Profile error:', profileError)
-
-        // STRICT CHECK: Require complete user profile
-        if (!userProfile || profileError) {
-          console.log('❌ No valid user profile found - user must complete registration first')
-          setStatus('registration-required')
-          setMessage('Tu cuenta no está completamente registrada. Debes completar tu perfil antes de unirte al proyecto.')
-          return
-        }
-
-        // Additional check: ensure profile has required fields
-        if (!userProfile.email || !userProfile.full_name) {
-          console.log('❌ Incomplete profile - missing email or full_name')
-          setStatus('registration-required')
-          setMessage('Tu perfil está incompleto. Debes completar tu información personal antes de unirte al proyecto.')
-          return
-        }
 
         console.log('🔍 User email:', userProfile.email)
         console.log('🔍 Invitation email:', invitationDetails.invitee_email)
@@ -192,9 +201,22 @@ export default function JoinProjectPage() {
           )}
           
           {status === 'registration-required' && (
-            <div className="flex justify-center">
-              <UserX className="h-8 w-8 text-red-600" />
-            </div>
+            <>
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4 mb-4">
+                <h3 className="text-red-800 font-medium mb-2">⚠️ Cuenta Requerida</h3>
+                <p className="text-red-700 text-sm">
+                  No puedes acceder al sistema sin una cuenta válida. Debes crear una cuenta completa primero.
+                </p>
+              </div>
+              <div className="flex gap-2 justify-center">
+                <Button onClick={() => router.push('/auth/sign-up-invitation')}>
+                  Crear Cuenta
+                </Button>
+                <Button variant="outline" onClick={() => router.push('/auth/login')}>
+                  Iniciar Sesión
+                </Button>
+              </div>
+            </>
           )}
           
           <p className="text-gray-600">{message}</p>
@@ -217,16 +239,7 @@ export default function JoinProjectPage() {
             </div>
           )}
           
-          {status === 'registration-required' && (
-            <div className="flex gap-2 justify-center">
-              <Button onClick={() => router.push('/profile')}>
-                Completar Perfil
-              </Button>
-              <Button variant="outline" onClick={() => router.push('/auth/login')}>
-                Ir a Iniciar Sesión
-              </Button>
-            </div>
-          )}
+
           
           {status === 'success' && (
             <div className="flex gap-2 justify-center">
