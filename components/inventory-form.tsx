@@ -265,6 +265,15 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     try {
       console.log("Attempting iOS-specific upload for:", file.name)
       
+      // Get authentication token
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.log("No access token for iOS upload")
+        return false
+      }
+      
       // Create a new FormData for iOS
       const formData = new FormData()
       formData.append("file", file, file.name) // Explicitly set filename
@@ -272,10 +281,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       // Add additional headers that might help with iOS
       const response = await fetch("/api/upload", {
         method: "POST",
-        body: formData,
         headers: {
+          'Authorization': `Bearer ${session.access_token}`
           // Don't set Content-Type for FormData on iOS
-        }
+        },
+        body: formData
       })
       
       if (!response.ok) {
@@ -296,6 +306,14 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const uploadFileStandard = async (file: File): Promise<void> => {
     console.log("Using standard upload method for:", file.name)
     
+    // Get authentication token
+    const supabase = createClient()
+    const { data: { session } } = await supabase.auth.getSession()
+    
+    if (!session?.access_token) {
+      throw new Error("Authentication required for photo upload")
+    }
+    
     const formData = new FormData()
     formData.append("file", file)
     
@@ -310,9 +328,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
     
     try {
-      console.log("Sending upload request to /api/upload")
+      console.log("Sending upload request to /api/upload with auth")
       const response = await fetch("/api/upload", {
         method: "POST",
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        },
         body: formData,
         signal: controller.signal
       })
