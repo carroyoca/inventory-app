@@ -55,32 +55,35 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if target user exists and is a member
-    const { data: targetUser, error: userError } = await supabase
+    // Check if target user exists and is a member (optional for notifications)
+    const { data: targetUser } = await supabase
       .from('profiles')
       .select('id')
       .eq('email', user_email)
       .single()
 
-    if (userError || !targetUser) {
-      return NextResponse.json(
-        { error: 'User not found. They need to sign up first.' },
-        { status: 404 }
-      )
-    }
+    let userRole = 'member' // default role for pending users
 
-    const { data: member, error: memberError } = await supabase
-      .from('project_members')
-      .select('role')
-      .eq('project_id', project_id)
-      .eq('user_id', targetUser.id)
-      .single()
+    if (targetUser) {
+      // User exists, check if they're a member
+      const { data: member, error: memberError } = await supabase
+        .from('project_members')
+        .select('role')
+        .eq('project_id', project_id)
+        .eq('user_id', targetUser.id)
+        .single()
 
-    if (memberError || !member) {
-      return NextResponse.json(
-        { error: 'User is not a member of this project' },
-        { status: 404 }
-      )
+      if (memberError || !member) {
+        return NextResponse.json(
+          { error: 'User is not a member of this project' },
+          { status: 404 }
+        )
+      }
+      userRole = member.role
+    } else {
+      // User doesn't exist yet - this is fine for notifications
+      // We'll send them an email to inform them about the project access
+      console.log('Sending notification to non-existent user:', user_email)
     }
 
     // Get project details
@@ -117,7 +120,7 @@ export async function POST(request: NextRequest) {
         to: user_email,
         projectName: project.name,
         grantedBy: senderProfile.full_name || senderProfile.email,
-        role: member.role
+        role: userRole
       })
 
       if (emailResult && 'success' in emailResult && emailResult.success === false) {
