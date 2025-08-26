@@ -76,14 +76,20 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   // Load project categories
   useEffect(() => {
     const loadCategories = async () => {
+      console.log('📂 Loading categories for project:', activeProject?.id)
       if (!activeProject) return
       
       try {
         const supabase = createClient()
         const { data: { session } } = await supabase.auth.getSession()
         
-        if (!session?.access_token) return
+        if (!session?.access_token) {
+          console.log('❌ No access token for categories loading')
+          return
+        }
 
+        console.log('🔑 Loading categories with token')
+        
         // Load inventory types and house zones in parallel
         const [typesResponse, zonesResponse] = await Promise.all([
           fetch(`/api/projects/${activeProject.id}/inventory-types`, {
@@ -98,18 +104,30 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           })
         ])
 
+        console.log('📊 Categories API responses:', {
+          types: typesResponse.status,
+          zones: zonesResponse.status
+        })
+
         if (typesResponse.ok) {
           const typesData = await typesResponse.json()
+          console.log('📦 Inventory types loaded:', typesData.data?.length || 0)
           setInventoryTypes(typesData.data || [])
+        } else {
+          console.log('❌ Types response failed:', await typesResponse.text())
         }
 
         if (zonesResponse.ok) {
           const zonesData = await zonesResponse.json()
+          console.log('🏠 House zones loaded:', zonesData.data?.length || 0)
           setHouseZones(zonesData.data || [])
+        } else {
+          console.log('❌ Zones response failed:', await zonesResponse.text())
         }
       } catch (error) {
-        console.error('Error loading project categories:', error)
+        console.error('❌ Error loading project categories:', error)
       } finally {
+        console.log('✅ Categories loading completed')
         setLoadingCategories(false)
       }
     }
@@ -354,8 +372,19 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
+    console.log('🚀 Form submission started')
+    console.log('📊 Current state:', {
+      inventoryTypes: inventoryTypes.length,
+      houseZones: houseZones.length,
+      uploadedPhotos: uploadedPhotos.length,
+      photos: photos.length,
+      isUploadingAny,
+      activeProject: !!activeProject
+    })
+    
     // Check if categories are properly configured first
     if (inventoryTypes.length === 0) {
+      console.log('❌ Validation failed: No inventory types')
       toast({
         title: "⚠️ Configuration Required",
         description: "No inventory types are configured for this project. Go to Dashboard → Categorías to add types first.",
@@ -365,6 +394,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     }
     
     if (houseZones.length === 0) {
+      console.log('❌ Validation failed: No house zones')
       toast({
         title: "⚠️ Configuration Required", 
         description: "No house zones are configured for this project. Go to Dashboard → Categorías to add areas first.",
@@ -382,9 +412,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       description: "Description"
     }
     
+    console.log('📝 Form data validation:')
     const missingFields = []
     for (const [field, label] of Object.entries(requiredFields)) {
       const fieldValue = formData.get(field)?.toString().trim()
+      console.log(`   ${field}:`, fieldValue)
       if (!fieldValue || fieldValue === '' || 
           fieldValue === 'no-types-configured' || 
           fieldValue === 'no-zones-configured') {
@@ -393,13 +425,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     }
     
     if (missingFields.length > 0) {
+      console.log('❌ Validation failed: Missing fields:', missingFields)
       toast({
-        title: "Required Fields Missing",
-        description: `Please fill in the following required fields: ${missingFields.join(', ')}`,
+        title: "⚠️ Required Fields Missing",
+        description: `Please fill in: ${missingFields.join(', ')}`,
         variant: "destructive"
       })
       return
     }
+    
+    console.log('✅ Form validation passed')
     
     // Check if there are pending photo uploads
     if (isUploadingAny || (photos.length > 0 && uploadedPhotos.length < photos.length)) {
@@ -515,9 +550,22 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }
     } catch (error) {
       console.error("Error adding item:", error)
+      console.error("Error details:", {
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        type: typeof error
+      })
+      
+      let errorMessage = "Failed to add inventory item"
+      if (error instanceof Error) {
+        errorMessage = error.message || errorMessage
+      } else if (typeof error === 'string') {
+        errorMessage = error || errorMessage
+      }
+      
       toast({
-        title: "Error",
-        description: error instanceof Error ? error.message : "Failed to add inventory item",
+        title: "❌ Error Creating Product",
+        description: errorMessage,
         variant: "destructive"
       })
     } finally {
