@@ -22,9 +22,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
   // Función para obtener el proyecto activo del usuario
   const getActiveProject = async () => {
     console.log('🔄 ProjectContext: getActiveProject called')
+    console.log('🔄 ProjectContext: Starting getActiveProject execution...')
     try {
       const supabase = createClient()
+      console.log('🔄 ProjectContext: About to get session...')
       const { data: { session } } = await supabase.auth.getSession()
+      console.log('🔄 ProjectContext: Session result:', !!session?.user)
       
       console.log('🔄 ProjectContext: Session check:', !!session?.user)
       
@@ -67,11 +70,30 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
       if (projects && projects.length > 0) {
         const projectData = projects[0]
         
-        // Get actual member count for this project
-        const { count: memberCount } = await supabase
-          .from('project_members')
-          .select('*', { count: 'exact', head: true })
-          .eq('project_id', projectData.project_id)
+        // Get actual member count using API endpoint (bypasses RLS restrictions)
+        console.log('🔄 ProjectContext: Fetching member counts for project:', projectData.project_id)
+        
+        let memberCount = 1 // fallback to 1 if API fails
+        try {
+          const { data: { session } } = await supabase.auth.getSession()
+          if (session?.access_token) {
+            const response = await fetch(`/api/projects/${projectData.project_id}/member-count`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
+              }
+            })
+            
+            if (response.ok) {
+              const memberData = await response.json()
+              memberCount = memberData.totalMemberCount
+              console.log('🔢 ProjectContext: Member count from API:', memberData)
+            } else {
+              console.warn('⚠️ ProjectContext: Member count API failed, using fallback')
+            }
+          }
+        } catch (error) {
+          console.warn('⚠️ ProjectContext: Member count API error, using fallback:', error)
+        }
         
         const project = {
           ...projectData.projects,
@@ -85,6 +107,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           member_count: memberCount || 1
         } as any
         console.log('🔄 ProjectContext: Setting active project:', project.name, 'with', memberCount, 'members')
+        console.log('🔄 ProjectContext: Full project object:', { ...project, members: '[hidden]' })
         setActiveProject(project)
       } else {
         console.log('🔄 ProjectContext: No projects found, setting activeProject to null')
@@ -163,11 +186,28 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw new Error("Project data is incomplete")
       }
 
-      // Get actual member count for this project
-      const { count: memberCount } = await supabase
-        .from('project_members')
-        .select('*', { count: 'exact', head: true })
-        .eq('project_id', projects.project_id)
+      // Get actual member count using API endpoint (bypasses RLS restrictions)
+      let memberCount = 1 // fallback to 1 if API fails
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (session?.access_token) {
+          const response = await fetch(`/api/projects/${projects.project_id}/member-count`, {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          })
+          
+          if (response.ok) {
+            const memberData = await response.json()
+            memberCount = memberData.totalMemberCount
+            console.log('🔢 ProjectContext: Member count from API (switchToProject):', memberData)
+          } else {
+            console.warn('⚠️ ProjectContext: Member count API failed, using fallback')
+          }
+        }
+      } catch (error) {
+        console.warn('⚠️ ProjectContext: Member count API error, using fallback:', error)
+      }
       
       const project = {
         ...projects.projects,

@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react"
 import { useParams, useRouter } from "next/navigation"
 import { createClient } from "@/lib/supabase/client"
+import { useProject } from "@/contexts/ProjectContext"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -21,19 +22,24 @@ interface ProjectAccess {
     full_name: string
     email: string
   }
+  status: 'active' | 'pending'
+  expires_at?: string
 }
 
 export default function ProjectAccessPage() {
   const params = useParams()
   const router = useRouter()
   const { toast } = useToast()
+  const { refreshActiveProject } = useProject()
   const [project, setProject] = useState<any>(null)
   const [accessList, setAccessList] = useState<ProjectAccess[]>([])
+  const [pendingUsers, setPendingUsers] = useState<any[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [isGranting, setIsGranting] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null)
   const [isRemoving, setIsRemoving] = useState<string | null>(null)
-  const [pendingUsers, setPendingUsers] = useState<Array<{email: string, role: string, pendingId: string}>>([])
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [hasPermission, setHasPermission] = useState(true)
   
   const [newAccess, setNewAccess] = useState({
     email: "",
@@ -49,6 +55,9 @@ export default function ProjectAccessPage() {
   const loadProjectData = async () => {
     try {
       const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session) throw new Error('No session')
       
       // Get project details
       const { data: projectData, error: projectError } = await supabase
@@ -60,38 +69,54 @@ export default function ProjectAccessPage() {
       if (projectError) throw projectError
       setProject(projectData)
 
-      // Get current project members
-      const { data: membersData, error: membersError } = await supabase
-        .from('project_members')
-        .select('*')
-        .eq('project_id', projectId)
-        .order('joined_at', { ascending: false })
+      // Use the updated API endpoint to get both active and pending access
+      const response = await fetch(`/api/project-access?project_id=${projectId}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+          'Content-Type': 'application/json'
+        }
+      })
 
-      if (membersError) throw membersError
-      
-      // Get user details for each member
-      const transformedData = await Promise.all(
-        (membersData || []).map(async (member) => {
-          const { data: userProfile } = await supabase
-            .from('profiles')
-            .select('full_name, email')
-            .eq('id', member.user_id)
-            .single()
-
-          return {
-            id: member.id,
-            user_email: userProfile?.email || 'Unknown',
-            role: member.role,
-            granted_at: member.joined_at,
-            granted_by: {
-              full_name: userProfile?.full_name || 'Unknown',
-              email: userProfile?.email || 'Unknown'
+      if (!response.ok) {
+        if (response.status === 403) {
+          // User doesn't have permission to manage access
+          setHasPermission(false)
+          setUserRole('member') // Assume member role if 403
+          
+          // Try to get user's own role from member-count API
+          try {
+            const memberCountResponse = await fetch(`/api/projects/${projectId}/member-count`, {
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+                'Content-Type': 'application/json'
+              }
+            })
+            if (memberCountResponse.ok) {
+              const memberData = await memberCountResponse.json()
+              setUserRole(memberData.userRole)
             }
+          } catch (error) {
+            console.warn('Could not fetch user role:', error)
           }
-        })
-      )
+          
+          toast({
+            title: "Acceso Limitado",
+            description: "Solo los propietarios y administradores pueden gestionar el acceso al proyecto.",
+            variant: "default"
+          })
+          return
+        }
+        throw new Error(`Failed to fetch access list: ${response.status}`)
+      }
+
+      const result = await response.json()
       
-      setAccessList(transformedData)
+      // The API now returns { accessList: [...], summary: {...} }
+      setAccessList(result.accessList || [])
+      setHasPermission(true)
+      
+      console.log('📊 Access summary:', result.summary)
 
     } catch (error) {
       console.error('Error loading project data:', error)
@@ -168,6 +193,7 @@ export default function ProjectAccessPage() {
       // Reset form and reload data
       setNewAccess({ email: "", role: "member" })
       loadProjectData()
+      refreshActiveProject()
 
     } catch (error) {
       console.error('Error granting access:', error)
@@ -251,6 +277,7 @@ export default function ProjectAccessPage() {
       })
 
       loadProjectData()
+      refreshActiveProject()
 
     } catch (error) {
       console.error('Error removing access:', error)
@@ -317,63 +344,93 @@ export default function ProjectAccessPage() {
       </div>
 
       <div className="grid gap-6">
-        {/* Grant Access Form */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <UserPlus className="h-5 w-5" />
-              Conceder Acceso
-            </CardTitle>
-            <CardDescription>
-              Añade usuarios al proyecto por email. Tendrán acceso inmediato cuando creen una cuenta.
-            </CardDescription>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={grantAccess} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div>
-                  <Label htmlFor="email">Email del usuario</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="usuario@ejemplo.com"
-                    value={newAccess.email}
-                    onChange={(e) => setNewAccess(prev => ({ ...prev, email: e.target.value }))}
-                    required
-                  />
+        {/* Permission Notice for non-owners/managers */}
+        {!hasPermission && (
+          <Card className="border-orange-200 bg-orange-50">
+            <CardContent className="p-6">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-orange-100 rounded-full">
+                  <Clock className="h-5 w-5 text-orange-600" />
                 </div>
                 <div>
-                  <Label htmlFor="role">Rol</Label>
-                  <Select
-                    value={newAccess.role}
-                    onValueChange={(value) => setNewAccess(prev => ({ ...prev, role: value }))}
-                  >
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="member">Miembro</SelectItem>
-                      <SelectItem value="manager">Administrador</SelectItem>
-                      <SelectItem value="viewer">Solo Lectura</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div className="flex items-end">
-                  <Button type="submit" disabled={isGranting} className="w-full">
-                    {isGranting ? "Concediendo..." : "Conceder Acceso"}
-                  </Button>
+                  <h3 className="font-semibold text-orange-800">Acceso de Solo Lectura</h3>
+                  <p className="text-sm text-orange-700">
+                    Tienes rol de <strong>{userRole || 'miembro'}</strong>. Solo los propietarios y administradores pueden gestionar el acceso al proyecto.
+                  </p>
                 </div>
               </div>
-            </form>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Grant Access Form - Only for owners/managers */}
+        {hasPermission && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <UserPlus className="h-5 w-5" />
+                Conceder Acceso
+              </CardTitle>
+              <CardDescription>
+                Añade usuarios al proyecto por email. Tendrán acceso inmediato cuando creen una cuenta.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <form onSubmit={grantAccess} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div>
+                    <Label htmlFor="email">Email del usuario</Label>
+                    <Input
+                      id="email"
+                      type="email"
+                      placeholder="usuario@ejemplo.com"
+                      value={newAccess.email}
+                      onChange={(e) => setNewAccess(prev => ({ ...prev, email: e.target.value }))}
+                      required
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="role">Rol</Label>
+                    <Select
+                      value={newAccess.role}
+                      onValueChange={(value) => setNewAccess(prev => ({ ...prev, role: value }))}
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="member">Miembro</SelectItem>
+                        <SelectItem value="manager">Administrador</SelectItem>
+                        <SelectItem value="viewer">Solo Lectura</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex items-end">
+                    <Button type="submit" disabled={isGranting} className="w-full">
+                      {isGranting ? "Concediendo..." : "Conceder Acceso"}
+                    </Button>
+                  </div>
+                </div>
+              </form>
+            </CardContent>
+          </Card>
+        )}
 
         {/* Access List */}
         <Card>
           <CardHeader>
             <CardTitle>Usuarios con Acceso</CardTitle>
             <CardDescription>
-              Lista de usuarios que tienen acceso al proyecto
+              {accessList.length > 0 && (
+                <span>
+                  {accessList.filter(a => a.status === 'active').length} activos
+                  {accessList.filter(a => a.status === 'pending').length > 0 && (
+                    <span> • {accessList.filter(a => a.status === 'pending').length} pendientes</span>
+                  )}
+                  {' '}de {accessList.length} total
+                </span>
+              )}
+              {accessList.length === 0 && "Lista de usuarios que tienen acceso al proyecto"}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -392,12 +449,24 @@ export default function ProjectAccessPage() {
                   >
                     <div className="flex items-center gap-4">
                       <div>
-                        <p className="font-medium">{access.user_email}</p>
+                        <div className="flex items-center gap-2">
+                          <p className="font-medium">{access.user_email}</p>
+                          <Badge variant={access.status === 'pending' ? 'outline' : 'secondary'}>
+                            {access.status === 'pending' ? (
+                              <><Clock className="h-3 w-3 mr-1" /> Pendiente</>
+                            ) : (
+                              '✓ Activo'
+                            )}
+                          </Badge>
+                        </div>
                         <p className="text-sm text-muted-foreground">
                           Concedido por {access.granted_by.full_name || access.granted_by.email}
                         </p>
                         <p className="text-xs text-muted-foreground">
                           {new Date(access.granted_at).toLocaleDateString()}
+                          {access.status === 'pending' && access.expires_at && (
+                            <span className="ml-2">• Expira: {new Date(access.expires_at).toLocaleDateString()}</span>
+                          )}
                         </p>
                       </div>
                     </div>
@@ -407,25 +476,29 @@ export default function ProjectAccessPage() {
                         {getRoleLabel(access.role)}
                       </Badge>
                       
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => sendNotificationEmail(access.user_email)}
-                        disabled={isSendingEmail === access.user_email}
-                      >
-                        <Mail className="h-4 w-4 mr-2" />
-                        {isSendingEmail === access.user_email ? "Enviando..." : "Notificar"}
-                      </Button>
-                      
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => removeAccess(access.id)}
-                        disabled={isRemoving === access.id}
-                      >
-                        <Trash2 className="h-4 w-4 mr-2" />
-                        {isRemoving === access.id ? "Eliminando..." : "Eliminar"}
-                      </Button>
+                      {hasPermission && (
+                        <>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => sendNotificationEmail(access.user_email)}
+                            disabled={isSendingEmail === access.user_email}
+                          >
+                            <Mail className="h-4 w-4 mr-2" />
+                            {isSendingEmail === access.user_email ? "Enviando..." : "Notificar"}
+                          </Button>
+                          
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => removeAccess(access.id)}
+                            disabled={isRemoving === access.id}
+                          >
+                            <Trash2 className="h-4 w-4 mr-2" />
+                            {isRemoving === access.id ? "Eliminando..." : "Eliminar"}
+                          </Button>
+                        </>
+                      )}
                     </div>
                   </div>
                 ))}
@@ -434,17 +507,18 @@ export default function ProjectAccessPage() {
           </CardContent>
         </Card>
 
-        {/* Pending Access Section */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Clock className="h-5 w-5" />
-              Acceso Pendiente
-            </CardTitle>
-            <CardDescription>
-              Usuarios que tienen acceso concedido pero aún no se han registrado
-            </CardDescription>
-          </CardHeader>
+        {/* Pending Access Section - Only for owners/managers */}
+        {hasPermission && (
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Clock className="h-5 w-5" />
+                Acceso Pendiente
+              </CardTitle>
+              <CardDescription>
+                Usuarios que tienen acceso concedido pero aún no se han registrado
+              </CardDescription>
+            </CardHeader>
           <CardContent>
             {pendingUsers.length === 0 ? (
               <div className="text-center py-8 text-muted-foreground">
@@ -492,6 +566,7 @@ export default function ProjectAccessPage() {
             )}
           </CardContent>
         </Card>
+        )}
       </div>
     </div>
   )

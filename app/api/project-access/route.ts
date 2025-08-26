@@ -44,6 +44,29 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Verify user has access to this project and is owner/manager
+    const { data: userMembership, error: membershipError } = await supabase
+      .from('project_members')
+      .select('role')
+      .eq('project_id', projectId)
+      .eq('user_id', user.id)
+      .single()
+
+    if (membershipError || !userMembership) {
+      return NextResponse.json(
+        { error: 'Project not found or access denied' },
+        { status: 404 }
+      )
+    }
+
+    // Only owners and managers can view/manage project access
+    if (!['owner', 'manager'].includes(userMembership.role)) {
+      return NextResponse.json(
+        { error: 'Insufficient permissions. Only owners and managers can manage project access.' },
+        { status: 403 }
+      )
+    }
+
     // Get project members list
     const { data: membersList, error: membersError } = await supabase
       .from('project_members')
