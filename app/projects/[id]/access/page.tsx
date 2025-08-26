@@ -131,12 +131,21 @@ export default function ProjectAccessPage() {
       const result = await response.json()
 
       if (!response.ok) {
+        if (response.status === 409 && result.alreadyMember) {
+          // User is already a member - show helpful message
+          toast({
+            title: "User Already Has Access",
+            description: result.message || "This user is already a member of the project. You can send them a notification email instead.",
+            variant: "default"
+          })
+          return
+        }
         throw new Error(result.error || 'Failed to grant access')
       }
 
       toast({
         title: "Success",
-        description: "Access granted successfully"
+        description: result.message || "Access granted successfully"
       })
 
       // Reset form and reload data

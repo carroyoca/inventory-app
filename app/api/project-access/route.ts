@@ -181,7 +181,11 @@ export async function POST(request: NextRequest) {
 
       if (existingMember) {
         return NextResponse.json(
-          { error: 'User is already a member of this project' },
+          { 
+            error: 'User is already a member of this project',
+            message: 'This user already has access to the project. You can send them a notification email instead.',
+            alreadyMember: true
+          },
           { status: 409 }
         )
       }
