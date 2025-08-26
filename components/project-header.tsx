@@ -131,6 +131,14 @@ export function ProjectHeader() {
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end" className="w-48">
               <DropdownMenuItem 
+                onClick={() => router.push('/profile')}
+                className="cursor-pointer"
+              >
+                <User className="mr-2 w-4 h-4" />
+                Mi Perfil
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem 
                 onClick={handleSignOut}
                 disabled={isLoading}
                 className="cursor-pointer text-red-600 focus:text-red-600"
@@ -199,6 +207,17 @@ export function ProjectHeader() {
             
             {/* User Actions */}
             <div className="pt-2 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  router.push('/profile')
+                  setIsMobileMenuOpen(false)
+                }}
+                className="w-full flex items-center px-3 py-2 text-left rounded-lg hover:bg-gray-50 transition-colors"
+              >
+                <User className="mr-3 w-4 h-4" />
+                Mi Perfil
+              </button>
+              
               <button
                 onClick={() => {
                   handleSignOut()

@@ -13,6 +13,7 @@ import { useState } from "react"
 
 export default function Page() {
   const [email, setEmail] = useState("")
+  const [fullName, setFullName] = useState("")
   const [password, setPassword] = useState("")
   const [repeatPassword, setRepeatPassword] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -40,6 +41,9 @@ export default function Page() {
         password,
         options: {
           emailRedirectTo: redirectUrl,
+          data: {
+            full_name: fullName,
+          },
         },
       })
 
@@ -68,6 +72,17 @@ export default function Page() {
             <CardContent>
               <form onSubmit={handleSignUp}>
                 <div className="flex flex-col gap-6">
+                  <div className="grid gap-2">
+                    <Label htmlFor="fullName">Full Name</Label>
+                    <Input
+                      id="fullName"
+                      type="text"
+                      placeholder="Your full name"
+                      required
+                      value={fullName}
+                      onChange={(e) => setFullName(e.target.value)}
+                    />
+                  </div>
                   <div className="grid gap-2">
                     <Label htmlFor="email">Email</Label>
                     <Input

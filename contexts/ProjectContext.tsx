@@ -66,6 +66,13 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
       if (projects && projects.length > 0) {
         const projectData = projects[0]
+        
+        // Get actual member count for this project
+        const { count: memberCount } = await supabase
+          .from('project_members')
+          .select('*', { count: 'exact', head: true })
+          .eq('project_id', projectData.project_id)
+        
         const project = {
           ...projectData.projects,
           members: [{
@@ -75,9 +82,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             role: projectData.role,
             joined_at: projectData.joined_at
           }],
-          member_count: 1
+          member_count: memberCount || 1
         } as any
-        console.log('🔄 ProjectContext: Setting active project:', project.name)
+        console.log('🔄 ProjectContext: Setting active project:', project.name, 'with', memberCount, 'members')
         setActiveProject(project)
       } else {
         console.log('🔄 ProjectContext: No projects found, setting activeProject to null')
@@ -156,6 +163,12 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw new Error("Project data is incomplete")
       }
 
+      // Get actual member count for this project
+      const { count: memberCount } = await supabase
+        .from('project_members')
+        .select('*', { count: 'exact', head: true })
+        .eq('project_id', projects.project_id)
+      
       const project = {
         ...projects.projects,
         members: [{
@@ -165,10 +178,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           role: projects.role,
           joined_at: projects.joined_at
         }],
-        member_count: 1
+        member_count: memberCount || 1
       } as any
 
-      console.log('✅ ProjectContext: Successfully prepared project data:', project.name)
+      console.log('✅ ProjectContext: Successfully prepared project data:', project.name, 'with', memberCount, 'members')
       setActiveProject(project)
       
     } catch (error) {
