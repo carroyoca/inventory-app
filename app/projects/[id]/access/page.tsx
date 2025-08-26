@@ -33,6 +33,7 @@ export default function ProjectAccessPage() {
   const [isGranting, setIsGranting] = useState(false)
   const [isSendingEmail, setIsSendingEmail] = useState<string | null>(null)
   const [isRemoving, setIsRemoving] = useState<string | null>(null)
+  const [pendingUsers, setPendingUsers] = useState<Array<{email: string, role: string, pendingId: string}>>([])
   
   const [newAccess, setNewAccess] = useState({
     email: "",
@@ -144,12 +145,19 @@ export default function ProjectAccessPage() {
       }
 
       if (result.pending) {
-        // User doesn't exist yet - show special message
+        // User doesn't exist yet - show special message and add to pending list
         toast({
           title: "Access Granted (Pending)",
           description: result.message || "The user will be added when they sign up with this email.",
           variant: "default"
         })
+        
+        // Add to pending users list
+        setPendingUsers(prev => [...prev, {
+          email: result.email,
+          role: newAccess.role,
+          pendingId: result.pendingId
+        }])
       } else {
         toast({
           title: "Success",
@@ -438,11 +446,50 @@ export default function ProjectAccessPage() {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="text-center py-8 text-muted-foreground">
-              <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
-              <p>No hay acceso pendiente</p>
-              <p className="text-sm">Cuando concedas acceso a un usuario que no existe, aparecerá aquí</p>
-            </div>
+            {pendingUsers.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Clock className="h-12 w-12 mx-auto mb-4 opacity-50" />
+                <p>No hay acceso pendiente</p>
+                <p className="text-sm">Cuando concedas acceso a un usuario que no existe, aparecerá aquí</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                {pendingUsers.map((pending) => (
+                  <div
+                    key={pending.pendingId}
+                    className="flex items-center justify-between p-4 border rounded-lg bg-yellow-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div>
+                        <p className="font-medium">{pending.email}</p>
+                        <p className="text-sm text-muted-foreground">
+                          Usuario pendiente de registro
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          Acceso concedido recientemente
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-2">
+                      <Badge className="bg-yellow-100 text-yellow-800">
+                        Pendiente
+                      </Badge>
+                      
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => sendNotificationEmail(pending.email)}
+                        disabled={isSendingEmail === pending.email}
+                      >
+                        <Mail className="h-4 w-4 mr-2" />
+                        {isSendingEmail === pending.email ? "Enviando..." : "Notificar"}
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
