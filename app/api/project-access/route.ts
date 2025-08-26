@@ -213,10 +213,10 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    // This code should never be reached, but just in case
     return NextResponse.json({
       success: true,
-      message: 'Access granted successfully',
-      access
+      message: 'Access granted successfully'
     })
 
   } catch (error) {
