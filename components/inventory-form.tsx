@@ -149,63 +149,37 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     }
   }, [mode, initialData])
 
-  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || [])
-    if (files.length === 0) return
-
-    console.log("Starting photo upload for", files.length, "files")
-    console.log("User Agent:", navigator.userAgent)
-    console.log("Is Mobile:", /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent))
-    console.log("Is iOS:", /iPad|iPhone|iPod/.test(navigator.userAgent))
-    console.log("Is Chrome:", /Chrome/.test(navigator.userAgent))
-    console.log("Event type:", e.type)
-    console.log("Event target:", e.target)
-    console.log("Files array:", files)
-
-    // iOS-specific file validation
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
-      console.log("File details:", {
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        lastModified: file.lastModified,
-        webkitRelativePath: (file as any).webkitRelativePath,
-        mozFullPath: (file as any).mozFullPath
-      })
-      
-      // Check if file is valid
-      if (!file.name || file.size === 0) {
-        console.error("Invalid file detected:", file)
-        toast({
-          title: "Invalid File",
-          description: `File ${file.name || 'Unknown'} appears to be invalid. Please try selecting a different photo.`,
-          variant: "destructive"
-        })
-        continue
-      }
-    }
-
-    // Add files to display immediately
-    setPhotos((prev) => [...prev, ...files])
-
-    // Set global upload state
+  const handlePhotoUpload = async (files: FileList) => {
+    console.log("Photo upload started with", files.length, "files")
+    
+    // Detect device type for better handling
+    const isAndroid = /Android/.test(navigator.userAgent)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const isMobile = isAndroid || isIOS
+    
+    console.log("Device detection:", { isAndroid, isIOS, isMobile })
+    
+    // Convert FileList to Array for better mobile handling
+    const fileArray = Array.from(files)
+    
+    // Add new photos to the list (don't replace existing ones)
+    setPhotos((prev) => [...prev, ...fileArray])
+    
+    // Initialize upload states for new photos
+    const newUploadStates = new Array(fileArray.length).fill(true)
+    setUploadingPhotos((prev) => [...prev, ...newUploadStates])
     setIsUploadingAny(true)
 
-    // Initialize uploading states for new files
-    const newUploadingStates = new Array(files.length).fill(true)
-    setUploadingPhotos((prev) => [...prev, ...newUploadingStates])
-
     // Upload each file sequentially to avoid race conditions
-    for (let i = 0; i < files.length; i++) {
-      const file = files[i]
+    for (let i = 0; i < fileArray.length; i++) {
+      const file = fileArray[i]
       console.log("Processing file for upload:", {
         index: i,
         name: file.name,
         size: file.size,
         type: file.type,
-        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB"
+        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+        device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
       })
       
       // Check file size for mobile
@@ -219,16 +193,22 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         })
       }
       
-      // Try alternative upload method for iOS
-      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
       let uploadSuccess = false
       
+      // Try device-specific upload methods
       if (isIOS) {
-        console.log("iOS detected, trying alternative upload method")
+        console.log("iOS detected, trying iOS-specific upload method")
         try {
           uploadSuccess = await uploadFileIOS(file)
         } catch (error) {
           console.log("iOS alternative upload failed, falling back to standard method")
+        }
+      } else if (isAndroid) {
+        console.log("Android detected, trying Android-specific upload method")
+        try {
+          uploadSuccess = await uploadFileAndroid(file)
+        } catch (error) {
+          console.log("Android alternative upload failed, falling back to standard method")
         }
       }
       
@@ -299,6 +279,48 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       
     } catch (error) {
       console.error("iOS upload failed:", error)
+      return false
+    }
+  }
+
+  const uploadFileAndroid = async (file: File): Promise<boolean> => {
+    try {
+      console.log("Attempting Android-specific upload for:", file.name)
+      
+      // Get authentication token
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) {
+        console.log("No access token for Android upload")
+        return false
+      }
+      
+      // Create a new FormData for Android with explicit file handling
+      const formData = new FormData()
+      formData.append("file", file, file.name) // Explicitly set filename
+      
+      // Add additional headers that might help with Android
+      const response = await fetch("/api/upload", {
+        method: "POST",
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+          // Don't set Content-Type for FormData on Android
+        },
+        body: formData
+      })
+      
+      if (!response.ok) {
+        throw new Error(`Upload failed with status: ${response.status}`)
+      }
+      
+      const uploadedPhoto: UploadedPhoto = await response.json()
+      console.log("Android upload successful:", uploadedPhoto)
+      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
+      return true
+      
+    } catch (error) {
+      console.error("Android upload failed:", error)
       return false
     }
   }
@@ -393,6 +415,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
+    // Detect device for better error handling
+    const isAndroid = /Android/.test(navigator.userAgent)
+    const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
+    const isMobile = isAndroid || isIOS
+    
     console.log('🚀 Form submission started')
     console.log('📊 Current state:', {
       inventoryTypes: inventoryTypes.length,
@@ -400,7 +427,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       uploadedPhotos: uploadedPhotos.length,
       photos: photos.length,
       isUploadingAny,
-      activeProject: !!activeProject
+      activeProject: !!activeProject,
+      device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
     })
     
     // Check if categories are properly configured first
@@ -424,8 +452,25 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       return
     }
 
-    // Form validation
+    // Form validation with mobile-friendly handling
     const formData = new FormData(e.currentTarget)
+    
+    // For mobile devices, ensure form data is properly captured
+    if (isMobile) {
+      console.log('📱 Mobile device detected, using enhanced form handling')
+      
+      // Manually capture form values for mobile
+      const form = e.currentTarget
+      const formElements = form.elements
+      
+      for (let i = 0; i < formElements.length; i++) {
+        const element = formElements[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+        if (element.name && element.value) {
+          console.log(`📱 Mobile form field: ${element.name} = ${element.value}`)
+        }
+      }
+    }
+    
     const requiredFields = {
       product_type: "Product Type",
       house_zone: "House Zone", 
@@ -538,13 +583,24 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         } else if (error.code === '23505') {
           throw new Error("An item with this ID already exists.")
         } else {
-          throw new Error(`Database error: ${error.message}`)
+          // Enhanced error message for mobile users
+          const errorMsg = isMobile 
+            ? `Database error: ${error.message}. Please check your internet connection and try again.`
+            : `Database error: ${error.message}`
+          throw new Error(errorMsg)
         }
       }
 
-      // Reset form safely
+      // Reset form safely with mobile-specific handling
       if (e.currentTarget && typeof e.currentTarget.reset === 'function') {
-        e.currentTarget.reset()
+        // For mobile devices, add a small delay before reset
+        if (isMobile) {
+          setTimeout(() => {
+            e.currentTarget.reset()
+          }, 1000) // 1 second delay for mobile
+        } else {
+          e.currentTarget.reset()
+        }
       }
       
       // Reset state
@@ -552,15 +608,29 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       setUploadedPhotos([])
       setUploadingPhotos([])
 
-      // Show success message
+      // Show success message with mobile-specific handling
       const successMessage = mode === 'edit' 
         ? "Inventory item updated successfully!" 
         : "Inventory item added successfully!"
-      toast({
-        title: "Success",
-        description: successMessage,
-        variant: "default"
-      })
+      
+      // For mobile devices, show a more prominent success message
+      if (isMobile) {
+        console.log('📱 Mobile success: Item saved successfully')
+        // Add a small delay for mobile to ensure the user sees the success
+        setTimeout(() => {
+          toast({
+            title: "✅ Success",
+            description: successMessage,
+            variant: "default"
+          })
+        }, 500)
+      } else {
+        toast({
+          title: "Success",
+          description: successMessage,
+          variant: "default"
+        })
+      }
       
       // Call onSuccess callback or redirect
       if (onSuccess) {
@@ -727,7 +797,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 type="file"
                 multiple
                 accept="image/*"
-                onChange={handlePhotoUpload}
+                onChange={(e) => {
+                  if (e.target.files) {
+                    handlePhotoUpload(e.target.files)
+                  }
+                }}
                 className="h-11 sm:h-10"
                 disabled={isSubmitting}
               />
