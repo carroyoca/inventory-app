@@ -17,6 +17,19 @@ export async function POST(request: NextRequest) {
   try {
     console.log("Upload API called")
     
+    // Log user agent for mobile debugging
+    const userAgent = request.headers.get('user-agent') || 'Unknown'
+    const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(userAgent)
+    const isAndroid = /Android/.test(userAgent)
+    const isIOS = /iPad|iPhone|iPod/.test(userAgent)
+    
+    console.log("📱 Device detection:", { 
+      userAgent: userAgent.substring(0, 100) + "...",
+      isMobile,
+      isAndroid,
+      isIOS
+    })
+    
     // Get authorization header and verify authentication
     const authHeader = request.headers.get('authorization')
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -37,11 +50,30 @@ export async function POST(request: NextRequest) {
     const formData = await request.formData()
     console.log("Form data received:", formData)
     
-    const file = formData.get("file") as File
+    // Enhanced file extraction for mobile devices
+    let file = formData.get("file") as File
+    
+    // For mobile devices, try alternative extraction methods
+    if (!file && isMobile) {
+      console.log("📱 Mobile device detected, trying alternative file extraction")
+      
+      // Try different possible field names
+      const possibleFieldNames = ["file", "image", "photo", "upload"]
+      for (const fieldName of possibleFieldNames) {
+        const potentialFile = formData.get(fieldName) as File
+        if (potentialFile && potentialFile.size > 0) {
+          file = potentialFile
+          console.log(`📱 Found file using field name: ${fieldName}`)
+          break
+        }
+      }
+    }
+    
     console.log("File extracted:", file ? {
       name: file.name,
       size: file.size,
-      type: file.type
+      type: file.type,
+      device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
     } : "No file")
 
     if (!file) {
@@ -54,10 +86,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Only image files are allowed" }, { status: 400 })
     }
 
-    // Validate file size (limit to 10MB)
-    const MAX_FILE_SIZE = 10 * 1024 * 1024 // 10MB
+    // Validate file size with mobile-specific limits
+    const MAX_FILE_SIZE = isMobile ? (15 * 1024 * 1024) : (10 * 1024 * 1024) // 15MB for mobile, 10MB for desktop
     if (file.size > MAX_FILE_SIZE) {
-      return NextResponse.json({ error: "File size too large. Maximum 10MB allowed." }, { status: 400 })
+      const maxSizeMB = isMobile ? 15 : 10
+      return NextResponse.json({ 
+        error: `File size too large. Maximum ${maxSizeMB}MB allowed.` 
+      }, { status: 400 })
     }
 
     // Create a unique filename with user ID and timestamp to avoid conflicts
