@@ -55,10 +55,47 @@ export default function Page() {
         throw error
       }
 
-      // Check if user was created but email confirmation is required
-      if (data.user && !data.user.email_confirmed_at) {
-        console.log("[v0] User created, email confirmation required")
-        console.log("[v0] User data:", data.user)
+      // Check if user was created
+      if (data.user) {
+        console.log("[v0] User created:", data.user.id)
+        console.log("[v0] Email confirmed:", !!data.user.email_confirmed_at)
+        
+        // If user is immediately confirmed (no email confirmation required)
+        if (data.user.email_confirmed_at) {
+          console.log("[v0] User immediately confirmed, ensuring profile exists")
+          
+          try {
+            // Check if profile exists
+            const { data: existingProfile, error: profileError } = await supabase
+              .from('profiles')
+              .select('id')
+              .eq('id', data.user.id)
+              .single()
+
+            if (profileError && profileError.code === 'PGRST116') {
+              // Profile doesn't exist, create it
+              console.log("[v0] Creating profile for immediately confirmed user")
+              
+              const { data: newProfile, error: insertError } = await supabase
+                .from('profiles')
+                .insert({
+                  id: data.user.id,
+                  email: data.user.email,
+                  full_name: fullName,
+                })
+                .select()
+                .single()
+
+              if (insertError) {
+                console.error("[v0] Error creating profile:", insertError)
+              } else {
+                console.log("[v0] Profile created successfully:", newProfile)
+              }
+            }
+          } catch (profileError) {
+            console.error("[v0] Error in profile creation:", profileError)
+          }
+        }
       }
 
       router.push("/auth/sign-up-success")

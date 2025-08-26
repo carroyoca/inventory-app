@@ -40,11 +40,52 @@ export async function GET(request: Request) {
       },
     )
 
-    const { error } = await supabase.auth.exchangeCodeForSession(code)
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
     
     if (error) {
       console.error("Error exchanging code for session:", error)
       return NextResponse.redirect(`${origin}/auth/auth-code-error`)
+    }
+
+    // CRITICAL: Ensure user profile is created
+    if (data.user) {
+      console.log("User authenticated, ensuring profile exists:", data.user.id)
+      
+      try {
+        // Check if profile already exists
+        const { data: existingProfile, error: profileError } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('id', data.user.id)
+          .single()
+
+        if (profileError && profileError.code === 'PGRST116') {
+          // Profile doesn't exist, create it
+          console.log("Profile doesn't exist, creating profile for user:", data.user.id)
+          
+          const { data: newProfile, error: insertError } = await supabase
+            .from('profiles')
+            .insert({
+              id: data.user.id,
+              email: data.user.email,
+              full_name: data.user.user_metadata?.full_name || '',
+            })
+            .select()
+            .single()
+
+          if (insertError) {
+            console.error("Error creating profile:", insertError)
+          } else {
+            console.log("Profile created successfully:", newProfile)
+          }
+        } else if (existingProfile) {
+          console.log("Profile already exists:", existingProfile.id)
+        } else {
+          console.error("Unexpected error checking profile:", profileError)
+        }
+      } catch (profileCreationError) {
+        console.error("Error in profile creation process:", profileCreationError)
+      }
     }
 
     // Successful authentication, redirect to dashboard
