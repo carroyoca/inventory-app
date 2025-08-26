@@ -62,26 +62,33 @@ export default function ProjectAccessPage() {
       // Get current project members
       const { data: membersData, error: membersError } = await supabase
         .from('project_members')
-        .select(`
-          *,
-          user:profiles(full_name, email)
-        `)
+        .select('*')
         .eq('project_id', projectId)
         .order('joined_at', { ascending: false })
 
       if (membersError) throw membersError
       
-      // Transform members data to match the expected format
-      const transformedData = membersData?.map(member => ({
-        id: member.id,
-        user_email: member.user?.email || 'Unknown',
-        role: member.role,
-        granted_at: member.joined_at,
-        granted_by: {
-          full_name: member.user?.full_name || 'Unknown',
-          email: member.user?.email || 'Unknown'
-        }
-      })) || []
+      // Get user details for each member
+      const transformedData = await Promise.all(
+        (membersData || []).map(async (member) => {
+          const { data: userProfile } = await supabase
+            .from('profiles')
+            .select('full_name, email')
+            .eq('id', member.user_id)
+            .single()
+
+          return {
+            id: member.id,
+            user_email: userProfile?.email || 'Unknown',
+            role: member.role,
+            granted_at: member.joined_at,
+            granted_by: {
+              full_name: userProfile?.full_name || 'Unknown',
+              email: userProfile?.email || 'Unknown'
+            }
+          }
+        })
+      )
       
       setAccessList(transformedData)
 

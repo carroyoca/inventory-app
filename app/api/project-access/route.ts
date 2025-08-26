@@ -47,10 +47,7 @@ export async function GET(request: NextRequest) {
     // Get project members list
     const { data: membersList, error: membersError } = await supabase
       .from('project_members')
-      .select(`
-        *,
-        user:profiles(full_name, email)
-      `)
+      .select('*')
       .eq('project_id', projectId)
       .order('joined_at', { ascending: false })
 
@@ -62,17 +59,27 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Transform to match expected format
-    const accessList = membersList?.map(member => ({
-      id: member.id,
-      user_email: member.user?.email || 'Unknown',
-      role: member.role,
-      granted_at: member.joined_at,
-      granted_by: {
-        full_name: member.user?.full_name || 'Unknown',
-        email: member.user?.email || 'Unknown'
-      }
-    })) || []
+    // Get user details for each member
+    const accessList = await Promise.all(
+      (membersList || []).map(async (member) => {
+        const { data: userProfile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', member.user_id)
+          .single()
+
+        return {
+          id: member.id,
+          user_email: userProfile?.email || 'Unknown',
+          role: member.role,
+          granted_at: member.joined_at,
+          granted_by: {
+            full_name: userProfile?.full_name || 'Unknown',
+            email: userProfile?.email || 'Unknown'
+          }
+        }
+      })
+    )
 
     return NextResponse.json({ accessList })
 
