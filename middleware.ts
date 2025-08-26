@@ -66,26 +66,63 @@ export async function middleware(request: NextRequest) {
         return NextResponse.redirect(url)
       }
       
+      // CRITICAL: For authenticated users on invitation routes, verify complete profile
+      const { data: userProfile, error: profileError } = await supabase
+        .from('profiles')
+        .select('id, email, full_name')
+        .eq('id', user.id)
+        .single()
+      
+      // If user doesn't have a complete profile, redirect to account creation
+      if (!userProfile || profileError || !userProfile.email || !userProfile.full_name) {
+        console.log('🚫 User with incomplete profile trying to access invitation route:', request.nextUrl.pathname)
+        console.log('🚫 Profile data:', userProfile)
+        console.log('🚫 Profile error:', profileError)
+        
+        // Clear any invalid session
+        try {
+          await supabase.auth.signOut()
+          console.log('🔒 Cleared invalid session in invitation route middleware')
+        } catch (signOutError) {
+          console.log('⚠️ Error clearing session in invitation route middleware:', signOutError)
+        }
+        
+        const url = request.nextUrl.clone()
+        url.pathname = "/auth/sign-up-invitation"
+        return NextResponse.redirect(url)
+      }
+      
       // For authenticated users on invitation routes, we'll let the page handle profile validation
       // The page will check if the user has a complete profile and redirect accordingly
-      console.log('✅ Authenticated user accessing invitation route:', request.nextUrl.pathname)
+      console.log('✅ Authenticated user with complete profile accessing invitation route:', request.nextUrl.pathname)
       return supabaseResponse
     }
     
     // CRITICAL: For all other protected routes, ensure user has complete profile
     if (user && !isPublicRoute && !request.nextUrl.pathname.startsWith("/auth")) {
       // Check if user has a complete profile
-      const { data: userProfile } = await supabase
+      const { data: userProfile, error: profileError } = await supabase
         .from('profiles')
         .select('id, email, full_name')
         .eq('id', user.id)
         .single()
       
       // If user doesn't have a complete profile, redirect to profile completion
-      if (!userProfile || !userProfile.email || !userProfile.full_name) {
+      if (!userProfile || profileError || !userProfile.email || !userProfile.full_name) {
         console.log('🚫 User with incomplete profile trying to access:', request.nextUrl.pathname)
+        console.log('🚫 Profile data:', userProfile)
+        console.log('🚫 Profile error:', profileError)
+        
+        // Clear any invalid session
+        try {
+          await supabase.auth.signOut()
+          console.log('🔒 Cleared invalid session in middleware')
+        } catch (signOutError) {
+          console.log('⚠️ Error clearing session in middleware:', signOutError)
+        }
+        
         const url = request.nextUrl.clone()
-        url.pathname = "/profile"
+        url.pathname = "/auth/sign-up-invitation"
         return NextResponse.redirect(url)
       }
     }
