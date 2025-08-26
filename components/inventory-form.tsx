@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Card, CardContent } from "@/components/ui/card"
-import { Upload, X, Plus, Loader2 } from "lucide-react"
+import { Upload, X, Plus, Loader2, ImageIcon } from "lucide-react"
 import { createClient } from "@/lib/supabase/client"
 import { useRouter } from "next/navigation"
 import Image from "next/image"
@@ -315,10 +315,10 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   }
 
   const removePhoto = async (index: number) => {
-    const uploadedPhoto = uploadedPhotos[index]
-
-    // Remove from uploaded photos if it exists
-    if (uploadedPhoto) {
+    // Check if this index refers to an uploaded photo or a pending photo
+    if (index < uploadedPhotos.length) {
+      // This is an uploaded photo
+      const uploadedPhoto = uploadedPhotos[index]
       try {
         await fetch("/api/delete-photo", {
           method: "DELETE",
@@ -327,13 +327,23 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         })
         setUploadedPhotos((prev) => prev.filter((_, i) => i !== index))
       } catch (error) {
-        console.error("Error deleting photo:", error)
+        console.error("Error deleting uploaded photo:", error)
+        toast({
+          title: "Error",
+          description: "Failed to delete photo",
+          variant: "destructive"
+        })
       }
+    } else {
+      // This is a pending photo (not yet uploaded)
+      const photoIndex = index - uploadedPhotos.length
+      setPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
+      setUploadingPhotos((prev) => {
+        const newStates = [...prev]
+        newStates.splice(index, 1)
+        return newStates
+      })
     }
-
-    // Remove from local files
-    setPhotos((prev) => prev.filter((_, i) => i !== index))
-    setUploadingPhotos((prev) => prev.filter((_, i) => i !== index))
   }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -665,7 +675,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
             </Button>
             
             <span className="text-sm text-gray-500 text-center sm:text-left">
-              {photos.length} photo{photos.length !== 1 ? "s" : ""} selected
+              {uploadedPhotos.length + photos.length} photo{(uploadedPhotos.length + photos.length) !== 1 ? "s" : ""} {uploadedPhotos.length + photos.length > 0 ? "ready" : "selected"}
             </span>
           </div>
           
@@ -708,37 +718,59 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
             </p>
           </div>
 
-          {photos.length > 0 && (
+          {(uploadedPhotos.length > 0 || photos.length > 0) && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
-              {photos.map((photo, index) => {
-                const uploadedPhoto = uploadedPhotos[index]
-                const isUploading = uploadingPhotos[index]
+              {/* Render uploaded photos first */}
+              {uploadedPhotos.map((uploadedPhoto, index) => (
+                <Card key={`uploaded-${index}`} className="relative">
+                  <CardContent className="p-2">
+                    <div className="aspect-square bg-gray-100 rounded flex items-center justify-center relative overflow-hidden">
+                      <Image
+                        src={uploadedPhoto.url || "/placeholder.svg"}
+                        alt={uploadedPhoto.filename}
+                        fill
+                        className="object-cover"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="sm"
+                        className="absolute -top-1 -right-1 h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0"
+                        onClick={() => removePhoto(index)}
+                      >
+                        <X className="h-4 w-4 sm:h-3 sm:w-3" />
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+              
+              {/* Render pending uploads */}
+              {photos.map((photo, photoIndex) => {
+                const uploadIndex = uploadedPhotos.length + photoIndex
+                const isUploading = uploadingPhotos[uploadIndex]
 
                 return (
-                  <Card key={index} className="relative">
+                  <Card key={`pending-${photoIndex}`} className="relative">
                     <CardContent className="p-2">
                       <div className="aspect-square bg-gray-100 rounded flex items-center justify-center relative overflow-hidden">
-                        {uploadedPhoto ? (
-                          <Image
-                            src={uploadedPhoto.url || "/placeholder.svg"}
-                            alt={uploadedPhoto.filename}
-                            fill
-                            className="object-cover"
-                          />
-                        ) : isUploading ? (
+                        {isUploading ? (
                           <div className="flex flex-col items-center gap-2">
                             <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
                             <span className="text-xs text-gray-500">Uploading...</span>
                           </div>
                         ) : (
-                          <span className="text-xs text-gray-500 text-center px-2">{photo.name}</span>
+                          <div className="flex flex-col items-center gap-2 text-center">
+                            <ImageIcon className="h-6 w-6 text-gray-400" />
+                            <span className="text-xs text-gray-500 px-2">{photo.name}</span>
+                          </div>
                         )}
                         <Button
                           type="button"
                           variant="destructive"
                           size="sm"
                           className="absolute -top-1 -right-1 h-7 w-7 sm:h-6 sm:w-6 rounded-full p-0"
-                          onClick={() => removePhoto(index)}
+                          onClick={() => removePhoto(uploadedPhotos.length + photoIndex)}
                         >
                           <X className="h-4 w-4 sm:h-3 sm:w-3" />
                         </Button>

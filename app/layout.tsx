@@ -4,6 +4,7 @@ import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import { ProjectProvider } from '@/contexts/ProjectContext'
 import { ThemeProvider } from '@/components/theme-provider'
+import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
   title: 'Inventory App - Gestión de Proyectos',
@@ -36,6 +37,7 @@ html {
         >
           <ProjectProvider>
             {children}
+            <Toaster />
           </ProjectProvider>
         </ThemeProvider>
       </body>
