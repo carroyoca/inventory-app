@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if target user exists and is a member (optional for notifications)
+    // Check if target user exists and get their role (for notifications)
     const { data: targetUser } = await supabase
       .from('profiles')
       .select('id')
@@ -65,21 +65,23 @@ export async function POST(request: NextRequest) {
     let userRole = 'member' // default role for pending users
 
     if (targetUser) {
-      // User exists, check if they're a member
-      const { data: member, error: memberError } = await supabase
+      // User exists, check if they're a member to get their role
+      const { data: member } = await supabase
         .from('project_members')
         .select('role')
         .eq('project_id', project_id)
         .eq('user_id', targetUser.id)
         .single()
 
-      if (memberError || !member) {
-        return NextResponse.json(
-          { error: 'User is not a member of this project' },
-          { status: 404 }
-        )
+      if (member) {
+        // User is already a member, use their current role
+        userRole = member.role
+        console.log('Sending notification to existing member:', user_email, 'with role:', userRole)
+      } else {
+        // User exists but is not a member - they should have been granted access separately
+        // We'll send notification with the default 'member' role
+        console.log('Sending notification to existing user (not yet member):', user_email)
       }
-      userRole = member.role
     } else {
       // User doesn't exist yet - this is fine for notifications
       // We'll send them an email to inform them about the project access

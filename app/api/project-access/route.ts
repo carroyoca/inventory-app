@@ -59,6 +59,19 @@ export async function GET(request: NextRequest) {
       )
     }
 
+    // Get pending access list
+    const { data: pendingList, error: pendingError } = await supabase
+      .from('pending_project_access')
+      .select('*')
+      .eq('project_id', projectId)
+      .gt('expires_at', new Date().toISOString()) // Only get non-expired pending access
+      .order('granted_at', { ascending: false })
+
+    if (pendingError) {
+      console.error('Error fetching pending access:', pendingError)
+      // Don't fail the whole request if pending access fails
+    }
+
     // Get user details for each member
     const accessList = await Promise.all(
       (membersList || []).map(async (member) => {
@@ -76,12 +89,47 @@ export async function GET(request: NextRequest) {
           granted_by: {
             full_name: userProfile?.full_name || 'Unknown',
             email: userProfile?.email || 'Unknown'
-          }
+          },
+          status: 'active'
         }
       })
     )
 
-    return NextResponse.json({ accessList })
+    // Add pending access to the list
+    const pendingAccessList = await Promise.all(
+      (pendingList || []).map(async (pending) => {
+        const { data: granterProfile } = await supabase
+          .from('profiles')
+          .select('full_name, email')
+          .eq('id', pending.granted_by)
+          .single()
+
+        return {
+          id: `pending_${pending.id}`,
+          user_email: pending.user_email,
+          role: pending.role,
+          granted_at: pending.granted_at,
+          granted_by: {
+            full_name: granterProfile?.full_name || 'Unknown',
+            email: granterProfile?.email || 'Unknown'
+          },
+          status: 'pending',
+          expires_at: pending.expires_at
+        }
+      })
+    )
+
+    // Combine active and pending access
+    const combinedAccessList = [...accessList, ...pendingAccessList]
+
+    return NextResponse.json({ 
+      accessList: combinedAccessList,
+      summary: {
+        active: accessList.length,
+        pending: pendingAccessList.length,
+        total: combinedAccessList.length
+      }
+    })
 
   } catch (error) {
     console.error('Project access GET error:', error)
@@ -215,19 +263,74 @@ export async function POST(request: NextRequest) {
         member
       })
     } else {
-      // User doesn't exist yet - store the access request in a simple way
-      // We'll create a simple pending access record
-      const pendingId = `pending_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`
-      
-      // For now, we'll just return success and the user will need to be added manually
-      // when they sign up, or we can implement a more sophisticated system later
-      return NextResponse.json({
-        success: true,
-        message: `Access granted for ${user_email}. Please send them a notification email to inform them about the project access.`,
-        pending: true,
-        email: user_email,
-        pendingId
-      })
+      // User doesn't exist yet - create a pending access record
+      try {
+        const { data: pendingAccess, error: pendingError } = await supabase
+          .from('pending_project_access')
+          .insert({
+            project_id,
+            user_email,
+            role,
+            granted_by: user.id
+          })
+          .select()
+          .single()
+
+        if (pendingError) {
+          // Check if it's a unique constraint violation (user already has pending access)
+          if (pendingError.code === '23505') {
+            // Update the existing pending access record
+            const { data: updatedAccess, error: updateError } = await supabase
+              .from('pending_project_access')
+              .update({
+                role,
+                granted_by: user.id,
+                granted_at: new Date().toISOString(),
+                expires_at: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toISOString() // 30 days from now
+              })
+              .eq('project_id', project_id)
+              .eq('user_email', user_email)
+              .select()
+              .single()
+
+            if (updateError) {
+              console.error('Error updating pending access:', updateError)
+              return NextResponse.json(
+                { error: 'Failed to update pending access' },
+                { status: 500 }
+              )
+            }
+
+            return NextResponse.json({
+              success: true,
+              message: `Access updated for ${user_email}. They will automatically join the project when they sign up.`,
+              pending: true,
+              email: user_email,
+              pendingAccess: updatedAccess
+            })
+          } else {
+            console.error('Error creating pending access:', pendingError)
+            return NextResponse.json(
+              { error: 'Failed to create pending access' },
+              { status: 500 }
+            )
+          }
+        }
+
+        return NextResponse.json({
+          success: true,
+          message: `Access granted for ${user_email}. They will automatically join the project when they sign up.`,
+          pending: true,
+          email: user_email,
+          pendingAccess
+        })
+      } catch (error) {
+        console.error('Error handling pending access:', error)
+        return NextResponse.json(
+          { error: 'Failed to process pending access' },
+          { status: 500 }
+        )
+      }
     }
 
     // This code should never be reached, but just in case
@@ -276,6 +379,61 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
+    // Check if this is a pending access removal
+    if (accessId.startsWith('pending_')) {
+      const pendingId = accessId.replace('pending_', '')
+      
+      // Get pending access details
+      const { data: pendingAccess, error: pendingError } = await supabase
+        .from('pending_project_access')
+        .select('*')
+        .eq('id', pendingId)
+        .single()
+
+      if (pendingError || !pendingAccess) {
+        return NextResponse.json(
+          { error: 'Pending access not found' },
+          { status: 404 }
+        )
+      }
+
+      // Check if user is owner/manager of the project
+      const { data: membership, error: membershipError } = await supabase
+        .from('project_members')
+        .select('role')
+        .eq('project_id', pendingAccess.project_id)
+        .eq('user_id', user.id)
+        .in('role', ['owner', 'manager'])
+        .single()
+
+      if (membershipError || !membership) {
+        return NextResponse.json(
+          { error: 'You do not have permission to remove pending access from this project' },
+          { status: 403 }
+        )
+      }
+
+      // Remove pending access
+      const { error: removeError } = await supabase
+        .from('pending_project_access')
+        .delete()
+        .eq('id', pendingId)
+
+      if (removeError) {
+        console.error('Error removing pending access:', removeError)
+        return NextResponse.json(
+          { error: 'Failed to remove pending access' },
+          { status: 500 }
+        )
+      }
+
+      return NextResponse.json({
+        success: true,
+        message: 'Pending access removed successfully'
+      })
+    }
+
+    // Handle regular member removal
     // Get member details
     const { data: member, error: memberError } = await supabase
       .from('project_members')
