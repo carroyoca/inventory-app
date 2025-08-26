@@ -21,7 +21,7 @@ export default function JoinProjectPage() {
         const invitationId = params.id as string
         const supabase = createClient()
         
-        // Get current session
+        // IMMEDIATE AUTHENTICATION CHECK
         const { data: { session } } = await supabase.auth.getSession()
         
         console.log('🔍 Session check:', !!session)
@@ -60,14 +60,33 @@ export default function JoinProjectPage() {
           
           setStatus('registration-required')
           setMessage('No tienes una cuenta válida. Debes crear una cuenta antes de unirte al proyecto.')
+          
+          // CRITICAL: Force redirect to prevent any system access
+          setTimeout(() => {
+            router.push('/auth/sign-up-invitation')
+          }, 3000)
           return
         }
 
         // Additional check: ensure profile has required fields
         if (!userProfile.email || !userProfile.full_name) {
           console.log('❌ Incomplete profile - missing email or full_name')
+          
+          // Clear any invalid session to prevent access to protected areas
+          try {
+            await supabase.auth.signOut()
+            console.log('🔒 Cleared invalid session')
+          } catch (signOutError) {
+            console.log('⚠️ Error clearing session:', signOutError)
+          }
+          
           setStatus('registration-required')
           setMessage('Tu perfil está incompleto. Debes completar tu información personal antes de unirte al proyecto.')
+          
+          // CRITICAL: Force redirect to prevent any system access
+          setTimeout(() => {
+            router.push('/auth/sign-up-invitation')
+          }, 3000)
           return
         }
 
@@ -134,11 +153,21 @@ export default function JoinProjectPage() {
         } else {
           setStatus('error')
           setMessage(data.error || 'Error al unirse al proyecto. Debes crear una cuenta válida para acceder al sistema.')
+          
+          // CRITICAL: Force redirect to prevent any system access
+          setTimeout(() => {
+            router.push('/auth/sign-up-invitation')
+          }, 3000)
         }
       } catch (error) {
         console.error('Error joining project:', error)
         setStatus('error')
         setMessage('Error de conexión. Debes crear una cuenta válida para acceder al sistema.')
+        
+        // CRITICAL: Force redirect to prevent any system access
+        setTimeout(() => {
+          router.push('/auth/sign-up-invitation')
+        }, 3000)
       }
     }
 
@@ -150,14 +179,14 @@ export default function JoinProjectPage() {
       <Card className="w-full max-w-md">
         <CardHeader className="text-center">
           <CardTitle className="text-2xl font-bold">
-            {status === 'loading' && 'Uniéndote al proyecto...'}
+            {status === 'loading' && 'Verificando acceso...'}
             {status === 'success' && '¡Bienvenido!'}
             {status === 'error' && 'Error'}
             {status === 'login-required' && 'Inicio de Sesión Requerido'}
             {status === 'registration-required' && 'Registro Incompleto'}
           </CardTitle>
           <CardDescription>
-            {status === 'loading' && 'Estamos procesando tu invitación'}
+            {status === 'loading' && 'Estamos verificando tu cuenta y permisos'}
             {status === 'success' && `Ya eres parte de ${projectName || 'el proyecto'}`}
             {status === 'error' && 'No se pudo procesar la invitación'}
             {status === 'login-required' && 'Necesitas iniciar sesión para continuar'}
