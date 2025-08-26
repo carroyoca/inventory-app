@@ -35,6 +35,7 @@ export default function Page() {
     try {
       const redirectUrl = `${window.location.origin}/auth/callback`
       console.log("[v0] Sign-up redirect URL:", redirectUrl)
+      console.log("[v0] Sign-up data:", { email, fullName })
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -49,11 +50,20 @@ export default function Page() {
 
       console.log("[v0] Sign-up response:", { data, error })
 
-      if (error) throw error
+      if (error) {
+        console.error("[v0] Sign-up error details:", error)
+        throw error
+      }
+
+      // Check if user was created but email confirmation is required
+      if (data.user && !data.user.email_confirmed_at) {
+        console.log("[v0] User created, email confirmation required")
+        console.log("[v0] User data:", data.user)
+      }
 
       router.push("/auth/sign-up-success")
     } catch (error: unknown) {
-      console.log("[v0] Sign-up error:", error)
+      console.error("[v0] Sign-up error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
     } finally {
       setIsLoading(false)
