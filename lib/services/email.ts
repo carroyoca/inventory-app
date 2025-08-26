@@ -99,3 +99,95 @@ export async function sendInvitationEmail({
     throw error
   }
 }
+
+export async function sendAccessNotificationEmail({
+  to,
+  projectName,
+  grantedBy,
+  role,
+}: {
+  to: string
+  projectName: string
+  grantedBy: string
+  role: string
+}) {
+  try {
+    console.log('📧 === SEND ACCESS NOTIFICATION EMAIL START ===')
+    console.log('📧 To:', to)
+    console.log('📧 Project:', projectName)
+    console.log('📧 Granted by:', grantedBy)
+    console.log('📧 Role:', role)
+    
+    // Check if Resend is configured
+    if (!resend) {
+      console.log('❌ Resend not configured, skipping email send')
+      return { success: false, reason: 'Resend not configured' }
+    }
+    
+    console.log('✅ Resend client available')
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
+    const loginUrl = `${baseUrl}/auth/login`
+    const signupUrl = `${baseUrl}/auth/sign-up`
+
+    console.log('📧 Preparing access notification email')
+    
+    const { data, error } = await resend.emails.send({
+      from: 'Art Inventory <onboarding@resend.dev>',
+      to: [to],
+      subject: `Acceso concedido al proyecto ${projectName}`,
+      html: `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <h2>¡Tienes acceso a un proyecto!</h2>
+          <p>Hola,</p>
+          <p><strong>${grantedBy}</strong> te ha concedido acceso al proyecto <strong>${projectName}</strong> en Art Inventory.</p>
+          
+          <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <p><strong>Proyecto:</strong> ${projectName}</p>
+            <p><strong>Rol asignado:</strong> ${role === 'owner' ? 'Propietario' : role === 'manager' ? 'Administrador' : role === 'member' ? 'Miembro' : 'Solo Lectura'}</p>
+            <p><strong>Acceso concedido por:</strong> ${grantedBy}</p>
+          </div>
+          
+          <div style="background-color: #dbeafe; border: 1px solid #3b82f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="color: #1d4ed8; margin-top: 0;">🎉 ¡Acceso inmediato disponible!</h3>
+            <p style="margin-bottom: 10px;"><strong>Ya tienes acceso al proyecto. Solo necesitas crear una cuenta o iniciar sesión.</strong></p>
+            <p style="margin-bottom: 0;">Una vez que accedas, verás el proyecto automáticamente en tu dashboard.</p>
+          </div>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${signupUrl}" style="background-color: #3b82f6; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; margin-right: 10px;">
+              📝 Crear Cuenta Nueva
+            </a>
+            <a href="${loginUrl}" style="background-color: #10b981; color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;">
+              🔑 Iniciar Sesión
+            </a>
+          </div>
+          
+          <div style="background-color: #f3f4f6; padding: 15px; border-radius: 8px; margin: 20px 0;">
+            <h4 style="margin-top: 0;">📋 Cómo acceder al proyecto:</h4>
+            <ol style="margin: 0; padding-left: 20px;">
+              <li><strong>Crear cuenta:</strong> Si no tienes una cuenta, haz clic en "Crear Cuenta Nueva"</li>
+              <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en Art Inventory</li>
+              <li><strong>Acceso automático:</strong> Una vez autenticado, verás el proyecto en tu dashboard</li>
+            </ol>
+          </div>
+          
+          <p style="font-size: 14px; color: #6b7280; text-align: center;">
+            Tu acceso está activo y listo para usar. No necesitas aceptar ninguna invitación.
+          </p>
+        </div>
+      `,
+    })
+
+    if (error) {
+      console.error('❌ Error sending access notification email:', error)
+      throw error
+    }
+
+    console.log('✅ Access notification email sent successfully:', data)
+    return data
+  } catch (error) {
+    console.error('Failed to send access notification email:', error)
+    throw error
+  }
+}

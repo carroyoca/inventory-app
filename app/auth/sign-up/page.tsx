@@ -98,7 +98,8 @@ export default function Page() {
         }
       }
 
-      router.push("/auth/sign-up-success")
+      // Redirect directly to dashboard since email confirmation is disabled
+      router.push("/dashboard")
     } catch (error: unknown) {
       console.error("[v0] Sign-up error:", error)
       setError(error instanceof Error ? error.message : "An error occurred")
