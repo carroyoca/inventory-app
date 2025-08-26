@@ -1,6 +1,6 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
@@ -8,6 +8,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Search, Filter, X, SlidersHorizontal } from "lucide-react"
 import { Badge } from "@/components/ui/badge"
+import { createClient } from "@/lib/supabase/client"
+import { useProject } from "@/contexts/ProjectContext"
 
 interface SearchFilters {
   search: string
@@ -23,32 +25,12 @@ interface InventorySearchProps {
   totalResults: number
 }
 
-const PRODUCT_TYPES = [
-  "Painting",
-  "Sculpture",
-  "Ceramic",
-  "Photography",
-  "Drawing",
-  "Print",
-  "Mixed Media",
-  "Textile",
-  "Jewelry",
-  "Other",
-]
+interface ProjectCategory {
+  id: string
+  name: string
+  description?: string
+}
 
-const HOUSE_ZONES = [
-  "Living Room",
-  "Bedroom",
-  "Kitchen",
-  "Dining Room",
-  "Study",
-  "Hallway",
-  "Basement",
-  "Attic",
-  "Garden",
-  "Garage",
-  "Storage",
-]
 
 const STATUS_OPTIONS = [
   { value: "available", label: "Available" },
@@ -58,6 +40,9 @@ const STATUS_OPTIONS = [
 ]
 
 export function InventorySearch({ onFiltersChange, totalResults }: InventorySearchProps) {
+  const { activeProject } = useProject()
+  const [inventoryTypes, setInventoryTypes] = useState<ProjectCategory[]>([])
+  const [houseZones, setHouseZones] = useState<ProjectCategory[]>([])
   const [filters, setFilters] = useState<SearchFilters>({
     search: "",
     productType: "all",
@@ -67,6 +52,48 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
     maxPrice: "",
   })
   const [showFilters, setShowFilters] = useState(false)
+
+  useEffect(() => {
+    if (activeProject) {
+      loadCategories()
+    }
+  }, [activeProject])
+
+  const loadCategories = async () => {
+    if (!activeProject) return
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      
+      if (!session?.access_token) return
+
+      const [typesResponse, zonesResponse] = await Promise.all([
+        fetch(`/api/projects/${activeProject.id}/inventory-types`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        }),
+        fetch(`/api/projects/${activeProject.id}/house-zones`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`
+          }
+        })
+      ])
+
+      if (typesResponse.ok) {
+        const typesData = await typesResponse.json()
+        setInventoryTypes(typesData.data || [])
+      }
+
+      if (zonesResponse.ok) {
+        const zonesData = await zonesResponse.json()
+        setHouseZones(zonesData.data || [])
+      }
+    } catch (error) {
+      console.error('Error loading categories:', error)
+    }
+  }
 
   const updateFilters = (newFilters: Partial<SearchFilters>) => {
     const updatedFilters = { ...filters, ...newFilters }
@@ -146,9 +173,9 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All types</SelectItem>
-                    {PRODUCT_TYPES.map((type) => (
-                      <SelectItem key={type} value={type}>
-                        {type}
+                    {inventoryTypes.map((type) => (
+                      <SelectItem key={type.id} value={type.name}>
+                        {type.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -164,9 +191,9 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All locations</SelectItem>
-                    {HOUSE_ZONES.map((zone) => (
-                      <SelectItem key={zone} value={zone}>
-                        {zone}
+                    {houseZones.map((zone) => (
+                      <SelectItem key={zone.id} value={zone.name}>
+                        {zone.name}
                       </SelectItem>
                     ))}
                   </SelectContent>

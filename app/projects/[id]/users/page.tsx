@@ -13,14 +13,17 @@ import Link from "next/link"
 import { createClient } from "@/lib/supabase/client"
 import { InvitationForm } from "@/components/invitation-form"
 import { InvitationsList } from "@/components/invitations-list"
+import { useToast } from "@/hooks/use-toast"
 
 export default function ProjectUsersPage() {
   const params = useParams()
-  const { activeProject } = useProject()
+  const { activeProject, refreshActiveProject } = useProject()
+  const { toast } = useToast()
   const [members, setMembers] = useState<any[]>([])
   const [userRole, setUserRole] = useState<string>("")
   const [isLoading, setIsLoading] = useState(true)
   const [activeTab, setActiveTab] = useState("members")
+  const [removingUserId, setRemovingUserId] = useState<string | null>(null)
 
   useEffect(() => {
     if (activeProject) {
@@ -91,6 +94,67 @@ export default function ProjectUsersPage() {
   const handleInvitationUpdated = () => {
     // Refresh members list when invitation is accepted
     fetchMembers()
+  }
+
+  const handleRemoveMember = async (userId: string, userName: string) => {
+    if (!activeProject) return
+    
+    // Confirm removal
+    const confirmed = window.confirm(`¿Estás seguro de que quieres remover a ${userName} del proyecto?`)
+    if (!confirmed) return
+
+    setRemovingUserId(userId)
+
+    try {
+      const supabase = createClient()
+      const { data: { session } } = await supabase.auth.getSession()
+      const token = session?.access_token
+
+      if (!token) {
+        toast({
+          title: "Error",
+          description: "No se pudo obtener el token de autenticación",
+          variant: "destructive"
+        })
+        return
+      }
+
+      const response = await fetch(`/api/projects/${activeProject.id}/members`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({ userId })
+      })
+
+      const data = await response.json()
+
+      if (response.ok) {
+        toast({
+          title: "Usuario removido",
+          description: `${userName} ha sido removido del proyecto`,
+        })
+        // Refresh the members list and project context
+        fetchMembers()
+        refreshActiveProject()
+      } else {
+        toast({
+          title: "Error",
+          description: data.error || "Error al remover el usuario",
+          variant: "destructive"
+        })
+      }
+    } catch (error) {
+      console.error('Error removing member:', error)
+      toast({
+        title: "Error",
+        description: "Error de conexión al remover el usuario",
+        variant: "destructive"
+      })
+    } finally {
+      setRemovingUserId(null)
+    }
   }
 
   if (!activeProject) {
@@ -169,8 +233,14 @@ export default function ProjectUsersPage() {
                              member.role === 'member' ? 'Miembro' : 'Solo Lectura'}
                           </Badge>
                           {member.role !== 'owner' && ['owner', 'manager'].includes(userRole) && (
-                            <Button variant="outline" size="sm" className="text-red-600 hover:text-red-700">
-                              Remover
+                            <Button 
+                              variant="outline" 
+                              size="sm" 
+                              className="text-red-600 hover:text-red-700"
+                              onClick={() => handleRemoveMember(member.user_id, member.user?.full_name || member.user?.email || 'Usuario')}
+                              disabled={removingUserId === member.user_id}
+                            >
+                              {removingUserId === member.user_id ? 'Removiendo...' : 'Remover'}
                             </Button>
                           )}
                         </div>

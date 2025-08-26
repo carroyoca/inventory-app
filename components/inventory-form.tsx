@@ -65,6 +65,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const [photos, setPhotos] = useState<File[]>([])
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
   const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([])
+  const [isUploadingAny, setIsUploadingAny] = useState(false)
   const [inventoryTypes, setInventoryTypes] = useState<ProjectCategory[]>([])
   const [houseZones, setHouseZones] = useState<ProjectCategory[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
@@ -171,11 +172,14 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     // Add files to display immediately
     setPhotos((prev) => [...prev, ...files])
 
+    // Set global upload state
+    setIsUploadingAny(true)
+
     // Initialize uploading states for new files
     const newUploadingStates = new Array(files.length).fill(true)
     setUploadingPhotos((prev) => [...prev, ...newUploadingStates])
 
-    // Upload each file
+    // Upload each file sequentially to avoid race conditions
     for (let i = 0; i < files.length; i++) {
       const file = files[i]
       console.log("Processing file for upload:", {
@@ -224,18 +228,19 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         }
       }
       
-      // Mark this photo as done uploading
+      // Mark this specific photo upload as complete
+      const currentUploadIndex = uploadedPhotos.length + i
       setUploadingPhotos((prev) => {
         const newStates = [...prev]
-        // Calculate the correct index for this file
-        const currentPhotosLength = prev.length
-        const fileIndex = currentPhotosLength - files.length + i
-        if (fileIndex >= 0 && fileIndex < newStates.length) {
-          newStates[fileIndex] = false
+        if (currentUploadIndex >= 0 && currentUploadIndex < newStates.length) {
+          newStates[currentUploadIndex] = false
         }
         return newStates
       })
     }
+
+    // All uploads complete
+    setIsUploadingAny(false)
   }
 
   const uploadFileIOS = async (file: File): Promise<boolean> => {
@@ -352,8 +357,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     // Check if categories are properly configured first
     if (inventoryTypes.length === 0) {
       toast({
-        title: "Configuration Required",
-        description: "No inventory types are configured for this project. Please configure inventory types in Project Actions first.",
+        title: "⚠️ Configuration Required",
+        description: "No inventory types are configured for this project. Go to Dashboard → Categorías to add types first.",
         variant: "destructive"
       })
       return
@@ -361,8 +366,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     
     if (houseZones.length === 0) {
       toast({
-        title: "Configuration Required", 
-        description: "No house zones are configured for this project. Please configure house zones in Project Actions first.",
+        title: "⚠️ Configuration Required", 
+        description: "No house zones are configured for this project. Go to Dashboard → Categorías to add areas first.",
         variant: "destructive"
       })
       return
@@ -396,14 +401,22 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       return
     }
     
-    // Check if at least one photo is uploaded
-    if (uploadedPhotos.length === 0) {
+    // Check if there are pending photo uploads
+    if (isUploadingAny || (photos.length > 0 && uploadedPhotos.length < photos.length)) {
       toast({
-        title: "Photo Required",
-        description: "Please upload at least one photo before submitting.",
+        title: "⏳ Photos Still Uploading",
+        description: `Please wait for all ${photos.length} photos to finish uploading before submitting.`,
         variant: "destructive"
       })
       return
+    }
+    
+    // Warn if no photos but allow submission
+    if (uploadedPhotos.length === 0 && mode === 'create') {
+      const confirmWithoutPhotos = window.confirm("No photos have been uploaded. Are you sure you want to create this item without photos?")
+      if (!confirmWithoutPhotos) {
+        return
+      }
     }
     
     setIsSubmitting(true)
