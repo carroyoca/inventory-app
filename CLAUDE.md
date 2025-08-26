@@ -1,1 +1,0 @@
-- try to keep the code as clean as possible, always thinking in scalability and usability
