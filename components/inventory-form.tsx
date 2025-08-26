@@ -287,14 +287,44 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     try {
       console.log("Attempting Android-specific upload for:", file.name)
       
-      // Get authentication token
+      // Get authentication token with retry logic
       const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
+      let session = null
+      let retryCount = 0
+      
+      while (retryCount < 3) {
+        const { data: { session: currentSession } } = await supabase.auth.getSession()
+        session = currentSession
+        
+        if (session?.access_token) {
+          console.log("✅ Android: Got valid session token")
+          break
+        }
+        
+        console.log(`⚠️ Android: No session token, retry ${retryCount + 1}/3`)
+        retryCount++
+        
+        if (retryCount < 3) {
+          // Try to refresh the session
+          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+          session = refreshedSession
+          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
+        }
+      }
       
       if (!session?.access_token) {
-        console.log("No access token for Android upload")
+        console.log("❌ Android: Failed to get valid session after retries")
+        toast({
+          title: "Authentication Error",
+          description: "Please refresh the page and try again",
+          variant: "destructive"
+        })
         return false
       }
+      
+      // Detect Samsung Browser for special handling
+      const isSamsungBrowser = /SamsungBrowser/.test(navigator.userAgent)
+      console.log("📱 Samsung Browser detected:", isSamsungBrowser)
       
       // Create a new FormData for Android with explicit file handling
       const formData = new FormData()
@@ -311,7 +341,9 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       })
       
       if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`)
+        const errorData = await response.json().catch(() => ({}))
+        console.error("Android upload failed:", errorData)
+        throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
       }
       
       const uploadedPhoto: UploadedPhoto = await response.json()
@@ -412,6 +444,39 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     }
   }
 
+  // Add session refresh function for mobile users
+  const refreshSession = async () => {
+    try {
+      const supabase = createClient()
+      const { data: { session }, error } = await supabase.auth.refreshSession()
+      
+      if (error) {
+        console.error("Session refresh failed:", error)
+        toast({
+          title: "Session Error",
+          description: "Please log in again",
+          variant: "destructive"
+        })
+        return false
+      }
+      
+      if (session) {
+        console.log("✅ Session refreshed successfully")
+        toast({
+          title: "Session Refreshed",
+          description: "You can now upload photos",
+          variant: "default"
+        })
+        return true
+      }
+      
+      return false
+    } catch (error) {
+      console.error("Session refresh error:", error)
+      return false
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
     
@@ -421,6 +486,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     const isMobile = isAndroid || isIOS
     
     console.log('🚀 Form submission started')
+    
     console.log('📊 Current state:', {
       inventoryTypes: inventoryTypes.length,
       houseZones: houseZones.length,
@@ -428,8 +494,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       photos: photos.length,
       isUploadingAny,
       activeProject: !!activeProject,
-      device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
+      device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop',
+      mode: mode
     })
+    
+    // Add mobile-specific logging for edit mode
+    if (mode === 'edit' && isMobile) {
+      console.log('📱 Mobile edit mode detected')
+      console.log('📱 Initial data:', initialData)
+      console.log('📱 Current uploaded photos:', uploadedPhotos.length)
+    }
     
     // Check if categories are properly configured first
     if (inventoryTypes.length === 0) {
@@ -536,8 +610,22 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         throw new Error("You must select a project before adding inventory items")
       }
 
-      // Use uploaded photo URLs
-      const photoUrls = uploadedPhotos.map((photo) => photo.url)
+      // Use uploaded photo URLs - preserve existing photos in edit mode
+      let photoUrls: string[]
+      if (mode === 'edit' && initialData) {
+        // In edit mode, combine existing photos with new uploaded ones
+        const existingPhotoUrls = initialData.photos || []
+        const newPhotoUrls = uploadedPhotos.map((photo) => photo.url)
+        photoUrls = [...existingPhotoUrls, ...newPhotoUrls]
+        console.log('📝 Edit mode: Combining photos:', {
+          existing: existingPhotoUrls.length,
+          new: newPhotoUrls.length,
+          total: photoUrls.length
+        })
+      } else {
+        // In create mode, use only uploaded photos
+        photoUrls = uploadedPhotos.map((photo) => photo.url)
+      }
 
       const itemData = {
         product_type: formData.get("product_type"),
@@ -584,7 +672,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           throw new Error("An item with this ID already exists.")
         } else {
           // Enhanced error message for mobile users
-          const errorMsg = isMobile 
+          const errorMsg = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)
             ? `Database error: ${error.message}. Please check your internet connection and try again.`
             : `Database error: ${error.message}`
           throw new Error(errorMsg)
@@ -592,9 +680,10 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }
 
       // Reset form safely with mobile-specific handling
-      if (e.currentTarget && typeof e.currentTarget.reset === 'function') {
+      // Don't reset form in edit mode to preserve user experience
+      if (mode !== 'edit' && e.currentTarget && typeof e.currentTarget.reset === 'function') {
         // For mobile devices, add a small delay before reset
-        if (isMobile) {
+        if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
           setTimeout(() => {
             e.currentTarget.reset()
           }, 1000) // 1 second delay for mobile
@@ -603,10 +692,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         }
       }
       
-      // Reset state
-      setPhotos([])
-      setUploadedPhotos([])
-      setUploadingPhotos([])
+      // Reset state only for create mode
+      if (mode !== 'edit') {
+        setPhotos([])
+        setUploadedPhotos([])
+        setUploadingPhotos([])
+      }
 
       // Show success message with mobile-specific handling
       const successMessage = mode === 'edit' 
@@ -614,7 +705,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         : "Inventory item added successfully!"
       
       // For mobile devices, show a more prominent success message
-      if (isMobile) {
+      if (/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent)) {
         console.log('📱 Mobile success: Item saved successfully')
         // Add a small delay for mobile to ensure the user sees the success
         setTimeout(() => {
@@ -1011,6 +1102,23 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       </div>
 
       <div className="pt-4">
+        {/* Mobile Session Refresh Button */}
+        {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
+          <div className="mb-4">
+            <Button 
+              type="button" 
+              variant="outline" 
+              onClick={refreshSession}
+              className="w-full sm:w-auto"
+            >
+              🔄 Refresh Session
+            </Button>
+            <p className="text-xs text-gray-500 mt-1">
+              If you're having trouble uploading photos, try refreshing your session
+            </p>
+          </div>
+        )}
+        
         <Button
           type="submit"
           disabled={isSubmitting}

@@ -32,17 +32,52 @@ export async function POST(request: NextRequest) {
     
     // Get authorization header and verify authentication
     const authHeader = request.headers.get('authorization')
+    
+    // Enhanced mobile authentication debugging
+    console.log("🔐 Authentication check:", {
+      hasAuthHeader: !!authHeader,
+      authHeaderLength: authHeader?.length || 0,
+      authHeaderStart: authHeader?.substring(0, 20) + "...",
+      isMobile,
+      isAndroid,
+      userAgent: userAgent.substring(0, 50) + "..."
+    })
+    
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return NextResponse.json({ error: "Authorization header required" }, { status: 401 })
+      console.log("❌ Authentication failed: Missing or invalid authorization header")
+      return NextResponse.json({ 
+        error: "Authorization header required",
+        details: "Please log in again and try uploading your photo"
+      }, { status: 401 })
     }
 
     const token = authHeader.replace('Bearer ', '')
     const supabase = createServiceRoleClient()
     
-    // Verify user authentication
+    // Verify user authentication with enhanced error handling
     const { data: { user }, error: authError } = await supabase.auth.getUser(token)
-    if (authError || !user) {
-      return NextResponse.json({ error: "Invalid authentication" }, { status: 401 })
+    
+    if (authError) {
+      console.log("❌ Authentication error:", {
+        error: authError.message,
+        code: authError.status,
+        isMobile,
+        isAndroid
+      })
+      return NextResponse.json({ 
+        error: "Authentication failed",
+        details: authError.message,
+        suggestion: "Please refresh the page and try again"
+      }, { status: 401 })
+    }
+    
+    if (!user) {
+      console.log("❌ No user found in token")
+      return NextResponse.json({ 
+        error: "User not found",
+        details: "Your session may have expired",
+        suggestion: "Please log in again"
+      }, { status: 401 })
     }
 
     console.log("✅ User authenticated:", user.id)
