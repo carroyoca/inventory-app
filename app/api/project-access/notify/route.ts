@@ -55,14 +55,14 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if user exists and is a member
-    const { data: user, error: userError } = await supabase
+    // Check if target user exists and is a member
+    const { data: targetUser, error: userError } = await supabase
       .from('profiles')
       .select('id')
       .eq('email', user_email)
       .single()
 
-    if (userError || !user) {
+    if (userError || !targetUser) {
       return NextResponse.json(
         { error: 'User not found. They need to sign up first.' },
         { status: 404 }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
       .from('project_members')
       .select('role')
       .eq('project_id', project_id)
-      .eq('user_id', user.id)
+      .eq('user_id', targetUser.id)
       .single()
 
     if (memberError || !member) {
