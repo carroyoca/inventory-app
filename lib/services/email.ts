@@ -46,7 +46,7 @@ export async function sendInvitationEmail({
     console.log('📧 Preparing email with URL:', joinUrl)
     
             const { data, error } = await resend.emails.send({
-          from: 'Art Inventory <onboarding@resend.dev>',
+          from: 'Art Inventory <noreply@inventory-4tuktc3ux-carlos-arroyos-projects.vercel.app>',
           to: [to],
           subject: `Invitación para unirse al proyecto ${projectName}`,
           html: `
@@ -144,7 +144,7 @@ export async function sendAccessNotificationEmail({
     console.log('📧 Using from address: onboarding@resend.dev')
     
     const { data, error } = await resend.emails.send({
-      from: 'Art Inventory <onboarding@resend.dev>',
+      from: 'Art Inventory <noreply@inventory-4tuktc3ux-carlos-arroyos-projects.vercel.app>',
       to: [to],
       subject: `Acceso concedido al proyecto ${projectName}`,
       html: `
