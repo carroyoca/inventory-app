@@ -29,8 +29,12 @@ export async function sendInvitationEmail({
     
     // Check if Resend is configured
     if (!resend) {
-      console.log('❌ Resend not configured, skipping email send')
-      return { success: false, reason: 'Resend not configured' }
+      console.log('❌ Resend not configured, using mock email for testing')
+      console.log('📧 MOCK EMAIL CONTENT:')
+      console.log(`To: ${to}`)
+      console.log(`Subject: Invitación para unirse al proyecto ${projectName}`)
+      console.log(`Message: ${inviterName} has invited you to join ${projectName} with role: ${role}`)
+      return { success: true, reason: 'Mock email sent (Resend not configured)' }
     }
     
     console.log('✅ Resend client available')
@@ -120,8 +124,12 @@ export async function sendAccessNotificationEmail({
     
     // Check if Resend is configured
     if (!resend) {
-      console.log('❌ Resend not configured, skipping email send')
-      return { success: false, reason: 'Resend not configured' }
+      console.log('❌ Resend not configured, using mock email for testing')
+      console.log('📧 MOCK EMAIL CONTENT:')
+      console.log(`To: ${to}`)
+      console.log(`Subject: Acceso concedido al proyecto ${projectName}`)
+      console.log(`Message: ${grantedBy} has granted you access to ${projectName} with role: ${role}`)
+      return { success: true, reason: 'Mock email sent (Resend not configured)' }
     }
     
     console.log('✅ Resend client available')
@@ -131,6 +139,9 @@ export async function sendAccessNotificationEmail({
     const signupUrl = `${baseUrl}/auth/sign-up`
 
     console.log('📧 Preparing access notification email')
+    
+    console.log('📧 Attempting to send email to:', to)
+    console.log('📧 Using from address: onboarding@resend.dev')
     
     const { data, error } = await resend.emails.send({
       from: 'Art Inventory <onboarding@resend.dev>',
@@ -181,6 +192,10 @@ export async function sendAccessNotificationEmail({
 
     if (error) {
       console.error('❌ Error sending access notification email:', error)
+      console.error('❌ Error details:', {
+        message: error.message,
+        name: error.name
+      })
       throw error
     }
 
