@@ -59,19 +59,31 @@ export default function ProjectAccessPage() {
       if (projectError) throw projectError
       setProject(projectData)
 
-      // Get access list
-      const { data: accessData, error: accessError } = await supabase
-        .from('project_access')
+      // Get current project members
+      const { data: membersData, error: membersError } = await supabase
+        .from('project_members')
         .select(`
           *,
-          granted_by:profiles!project_access_granted_by_fkey(full_name, email)
+          user:profiles(full_name, email)
         `)
         .eq('project_id', projectId)
-        .eq('is_active', true)
-        .order('granted_at', { ascending: false })
+        .order('joined_at', { ascending: false })
 
-      if (accessError) throw accessError
-      setAccessList(accessData || [])
+      if (membersError) throw membersError
+      
+      // Transform members data to match the expected format
+      const transformedData = membersData?.map(member => ({
+        id: member.id,
+        user_email: member.user?.email || 'Unknown',
+        role: member.role,
+        granted_at: member.joined_at,
+        granted_by: {
+          full_name: member.user?.full_name || 'Unknown',
+          email: member.user?.email || 'Unknown'
+        }
+      })) || []
+      
+      setAccessList(transformedData)
 
     } catch (error) {
       console.error('Error loading project data:', error)

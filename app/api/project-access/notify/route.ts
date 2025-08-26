@@ -55,18 +55,30 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if access exists
-    const { data: access, error: accessError } = await supabase
-      .from('project_access')
-      .select('*')
-      .eq('project_id', project_id)
-      .eq('user_email', user_email)
-      .eq('is_active', true)
+    // Check if user exists and is a member
+    const { data: user, error: userError } = await supabase
+      .from('profiles')
+      .select('id')
+      .eq('email', user_email)
       .single()
 
-    if (accessError || !access) {
+    if (userError || !user) {
       return NextResponse.json(
-        { error: 'User does not have access to this project' },
+        { error: 'User not found. They need to sign up first.' },
+        { status: 404 }
+      )
+    }
+
+    const { data: member, error: memberError } = await supabase
+      .from('project_members')
+      .select('role')
+      .eq('project_id', project_id)
+      .eq('user_id', user.id)
+      .single()
+
+    if (memberError || !member) {
+      return NextResponse.json(
+        { error: 'User is not a member of this project' },
         { status: 404 }
       )
     }
@@ -105,7 +117,7 @@ export async function POST(request: NextRequest) {
         to: user_email,
         projectName: project.name,
         grantedBy: senderProfile.full_name || senderProfile.email,
-        role: access.role
+        role: member.role
       })
 
       if (emailResult && 'success' in emailResult && emailResult.success === false) {

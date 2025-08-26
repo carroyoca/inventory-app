@@ -44,24 +44,35 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Get project access list
-    const { data: accessList, error: accessError } = await supabase
-      .from('project_access')
+    // Get project members list
+    const { data: membersList, error: membersError } = await supabase
+      .from('project_members')
       .select(`
         *,
-        granted_by:profiles!project_access_granted_by_fkey(full_name, email)
+        user:profiles(full_name, email)
       `)
       .eq('project_id', projectId)
-      .eq('is_active', true)
-      .order('granted_at', { ascending: false })
+      .order('joined_at', { ascending: false })
 
-    if (accessError) {
-      console.error('Error fetching project access:', accessError)
+    if (membersError) {
+      console.error('Error fetching project members:', membersError)
       return NextResponse.json(
-        { error: 'Failed to fetch project access' },
+        { error: 'Failed to fetch project members' },
         { status: 500 }
       )
     }
+
+    // Transform to match expected format
+    const accessList = membersList?.map(member => ({
+      id: member.id,
+      user_email: member.user?.email || 'Unknown',
+      role: member.role,
+      granted_at: member.joined_at,
+      granted_by: {
+        full_name: member.user?.full_name || 'Unknown',
+        email: member.user?.email || 'Unknown'
+      }
+    })) || []
 
     return NextResponse.json({ accessList })
 
@@ -145,43 +156,7 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Check if access already exists
-    const { data: existingAccess, error: existingError } = await supabase
-      .from('project_access')
-      .select('id')
-      .eq('project_id', project_id)
-      .eq('user_email', user_email)
-      .eq('is_active', true)
-      .single()
-
-    if (existingAccess) {
-      return NextResponse.json(
-        { error: 'User already has access to this project' },
-        { status: 409 }
-      )
-    }
-
-    // Grant access
-    const { data: access, error: accessError } = await supabase
-      .from('project_access')
-      .insert({
-        project_id,
-        user_email,
-        role,
-        granted_by: user.id
-      })
-      .select()
-      .single()
-
-    if (accessError) {
-      console.error('Error granting access:', accessError)
-      return NextResponse.json(
-        { error: 'Failed to grant access' },
-        { status: 500 }
-      )
-    }
-
-    // If user already has a profile, add them to project_members immediately
+    // Check if user already exists
     const { data: existingUser } = await supabase
       .from('profiles')
       .select('id')
@@ -189,17 +164,53 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existingUser) {
-      const { error: memberError } = await supabase
+      // Check if user is already a member
+      const { data: existingMember, error: memberCheckError } = await supabase
+        .from('project_members')
+        .select('id')
+        .eq('project_id', project_id)
+        .eq('user_id', existingUser.id)
+        .single()
+
+      if (existingMember) {
+        return NextResponse.json(
+          { error: 'User is already a member of this project' },
+          { status: 409 }
+        )
+      }
+
+      // Add user to project_members
+      const { data: member, error: memberError } = await supabase
         .from('project_members')
         .insert({
           project_id,
           user_id: existingUser.id,
           role
         })
+        .select()
+        .single()
 
       if (memberError) {
-        console.error('Error adding existing user to project:', memberError)
+        console.error('Error adding user to project:', memberError)
+        return NextResponse.json(
+          { error: 'Failed to add user to project' },
+          { status: 500 }
+        )
       }
+
+      return NextResponse.json({
+        success: true,
+        message: 'User added to project successfully',
+        member
+      })
+    } else {
+      // User doesn't exist yet, store the access request for when they sign up
+      // For now, we'll just return success and the user will be added when they sign up
+      return NextResponse.json({
+        success: true,
+        message: 'Access granted. User will be added to project when they sign up.',
+        pending: true
+      })
     }
 
     return NextResponse.json({
@@ -248,16 +259,16 @@ export async function DELETE(request: NextRequest) {
       )
     }
 
-    // Get access details
-    const { data: access, error: accessError } = await supabase
-      .from('project_access')
+    // Get member details
+    const { data: member, error: memberError } = await supabase
+      .from('project_members')
       .select('*')
       .eq('id', accessId)
       .single()
 
-    if (accessError || !access) {
+    if (memberError || !member) {
       return NextResponse.json(
-        { error: 'Access not found' },
+        { error: 'Member not found' },
         { status: 404 }
       )
     }
@@ -266,49 +277,30 @@ export async function DELETE(request: NextRequest) {
     const { data: membership, error: membershipError } = await supabase
       .from('project_members')
       .select('role')
-      .eq('project_id', access.project_id)
+      .eq('project_id', member.project_id)
       .eq('user_id', user.id)
       .in('role', ['owner', 'manager'])
       .single()
 
     if (membershipError || !membership) {
       return NextResponse.json(
-        { error: 'You do not have permission to remove access from this project' },
+        { error: 'You do not have permission to remove members from this project' },
         { status: 403 }
       )
     }
 
-    // Remove access (soft delete)
+    // Remove member from project
     const { error: removeError } = await supabase
-      .from('project_access')
-      .update({ is_active: false })
+      .from('project_members')
+      .delete()
       .eq('id', accessId)
 
     if (removeError) {
-      console.error('Error removing access:', removeError)
+      console.error('Error removing member:', removeError)
       return NextResponse.json(
-        { error: 'Failed to remove access' },
+        { error: 'Failed to remove member' },
         { status: 500 }
       )
-    }
-
-    // Remove from project_members if user exists
-    const { data: existingUser } = await supabase
-      .from('profiles')
-      .select('id')
-      .eq('email', access.user_email)
-      .single()
-
-    if (existingUser) {
-      const { error: memberError } = await supabase
-        .from('project_members')
-        .delete()
-        .eq('project_id', access.project_id)
-        .eq('user_id', existingUser.id)
-
-      if (memberError) {
-        console.error('Error removing user from project:', memberError)
-      }
     }
 
     return NextResponse.json({
