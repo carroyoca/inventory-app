@@ -274,14 +274,14 @@ export default function DashboardPage() {
 
             <Card 
               className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 cursor-pointer"
-              onClick={() => router.push(`/projects/${activeProject.id}/users`)}
+              onClick={() => router.push(`/projects/${activeProject.id}/access`)}
             >
               <CardContent className="p-6 text-center">
                 <div className="p-3 bg-green-100 rounded-xl w-fit mx-auto mb-4">
                   <Users className="h-6 w-6 text-green-600" />
                 </div>
-                <h3 className="font-semibold text-gray-900 mb-2">Usuarios</h3>
-                <p className="text-sm text-gray-600">Gestionar miembros</p>
+                <h3 className="font-semibold text-gray-900 mb-2">Acceso</h3>
+                <p className="text-sm text-gray-600">Gestionar acceso</p>
               </CardContent>
             </Card>
 
