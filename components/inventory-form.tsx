@@ -484,22 +484,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         throw new Error("You must select a project before adding inventory items")
       }
 
-      // Use uploaded photo URLs - preserve existing photos in edit mode
-      let photoUrls: string[]
-      if (mode === 'edit' && initialData) {
-        // In edit mode, combine existing photos with new uploaded ones
-        const existingPhotoUrls = initialData.photos || []
-        const newPhotoUrls = uploadedPhotos.map((photo) => photo.url)
-        photoUrls = [...existingPhotoUrls, ...newPhotoUrls]
-        console.log('📝 Edit mode: Combining photos:', {
-          existing: existingPhotoUrls.length,
-          new: newPhotoUrls.length,
-          total: photoUrls.length
-        })
-      } else {
-        // In create mode, use only uploaded photos
-        photoUrls = uploadedPhotos.map((photo) => photo.url)
-      }
+      // Use current uploadedPhotos state (reflects all additions and deletions)
+      const photoUrls = uploadedPhotos.map((photo) => photo.url)
+      console.log('📝 Using current photo state:', {
+        uploadedPhotosCount: uploadedPhotos.length,
+        photoUrls: photoUrls.length,
+        mode: mode
+      })
 
       const itemData = {
         product_type: formData.get("product_type"),
