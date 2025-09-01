@@ -8,6 +8,15 @@ const nextConfig = {
   },
   images: {
     unoptimized: true,
+    domains: ['u2ah9t7wczxlxpqe.public.blob.vercel-storage.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: '*.public.blob.vercel-storage.com',
+        port: '',
+        pathname: '/**',
+      },
+    ],
   },
   serverExternalPackages: ['@supabase/realtime-js'],
   // Move CORS to vercel.json for better production handling
