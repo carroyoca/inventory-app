@@ -3,6 +3,7 @@
 import type React from "react"
 
 import { useState, useRef, useEffect } from "react"
+import { flushSync } from "react-dom"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
@@ -64,11 +65,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
   const [uploadedPhotos, setUploadedPhotos] = useState<UploadedPhoto[]>([])
-  const [uploadingPhotos, setUploadingPhotos] = useState<boolean[]>([])
+  const [uploadingPhotos, setUploadingPhotos] = useState<Map<string, boolean>>(new Map())
   const [isUploadingAny, setIsUploadingAny] = useState(false)
   const [inventoryTypes, setInventoryTypes] = useState<ProjectCategory[]>([])
   const [houseZones, setHouseZones] = useState<ProjectCategory[]>([])
   const [loadingCategories, setLoadingCategories] = useState(true)
+  const [lastUploadSource, setLastUploadSource] = useState<'camera' | 'gallery' | null>(null)
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const { activeProject } = useProject()
@@ -175,28 +177,36 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     // Add new photos to the list (don't replace existing ones)
     setPhotos((prev) => [...prev, ...fileArray])
     
-    // Initialize upload states for new photos
-    const newUploadStates = new Array(fileArray.length).fill(true)
-    const startingUploadIndex = uploadingPhotos.length // Capture the starting index BEFORE state updates
+    // Create file keys for tracking
+    const fileKeys: string[] = []
     
+    // Initialize upload states for new photos using Map for better tracking
     setUploadingPhotos((prev) => {
-      const updatedStates = [...prev, ...newUploadStates]
-      console.log("📊 Upload states updated:", {
-        previousStates: prev.length,
-        newStates: newUploadStates.length,
-        totalStates: updatedStates.length,
-        startingIndex: startingUploadIndex,
-        mode: mode
+      const newMap = new Map(prev)
+      fileArray.forEach((file, index) => {
+        const fileKey = `${file.name}-${file.size}-${Date.now()}-${index}`
+        fileKeys.push(fileKey)
+        newMap.set(fileKey, true)
       })
-      return updatedStates
+      console.log("📊 Upload states updated:", {
+        previousStates: prev.size,
+        newFiles: fileArray.length,
+        totalStates: newMap.size,
+        mode: mode,
+        fileKeys: fileKeys
+      })
+      return newMap
     })
     setIsUploadingAny(true)
 
     // Upload each file sequentially to avoid race conditions
     for (let i = 0; i < fileArray.length; i++) {
       const file = fileArray[i]
+      const fileKey = fileKeys[i]
+      
       console.log("Processing file for upload:", {
         index: i,
+        fileKey,
         name: file.name,
         size: file.size,
         type: file.type,
@@ -229,30 +239,36 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         })
       }
       
-      // Mark this specific photo upload as complete
-      // FIXED: Use the captured starting index to avoid state race conditions
-      const uploadStateIndex = startingUploadIndex + i
-      console.log("🔄 Marking upload complete (FIXED v2):", {
+      // Mark this specific photo upload as complete using Map
+      console.log("🔄 Marking upload complete (Map-based):", {
         fileIndex: i,
-        startingUploadIndex,
-        uploadStateIndex,
+        fileKey,
         mode: mode
       })
       
       setUploadingPhotos((prev) => {
-        const newStates = [...prev]
-        if (uploadStateIndex >= 0 && uploadStateIndex < newStates.length) {
-          newStates[uploadStateIndex] = false
-          console.log("✅ Upload state marked complete at index", uploadStateIndex)
+        const newMap = new Map(prev)
+        if (newMap.has(fileKey)) {
+          newMap.set(fileKey, false)
+          console.log("✅ Upload state marked complete for key", fileKey)
         } else {
-          console.log("⚠️ Upload index out of bounds:", uploadStateIndex, "vs length", newStates.length)
+          console.log("⚠️ File key not found in upload states:", fileKey)
         }
-        return newStates
+        return newMap
       })
     }
 
-    // All uploads complete
-    setIsUploadingAny(false)
+    // All uploads complete - check if any are still uploading
+    setTimeout(() => {
+      setUploadingPhotos((prev) => {
+        const stillUploading = Array.from(prev.values()).some(uploading => uploading === true)
+        if (!stillUploading) {
+          setIsUploadingAny(false)
+          console.log("🎉 All uploads completed!")
+        }
+        return prev
+      })
+    }, 100)
   }
 
   const uploadFileUnified = async (file: File) => {
@@ -331,8 +347,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       const uploadedPhoto: UploadedPhoto = await response.json()
       console.log("✅ Upload successful:", uploadedPhoto)
       
-      // Detect if this was a camera or gallery upload
-      const isCamera = file.name.toLowerCase().includes('image') || file.name.toLowerCase().includes('camera')
+      // Detect if this was a camera or gallery upload based on how it was triggered
+      const isCamera = lastUploadSource === 'camera'
       const deviceType = /Android/.test(navigator.userAgent) ? 'Android' : /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Desktop'
       
       console.log("📸 Photo upload details:", {
@@ -345,13 +361,37 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         urlLength: uploadedPhoto.url?.length || 0
       })
       
-      // Update state atomically to prevent race conditions
-      setUploadedPhotos((prev) => {
-        const newPhotos = [...prev, uploadedPhoto]
-        console.log(`📊 Photo state update: ${prev.length} -> ${newPhotos.length}`)
-        console.log("📊 All uploaded photos:", newPhotos.map((p, i) => `${i}: ${p.filename} (${p.url?.substring(0, 50)}...)`))
-        return newPhotos
+      // Update state with React flushSync to ensure immediate update on mobile
+      console.log("🔄 BEFORE state update - current uploadedPhotos:", uploadedPhotos.length)
+      
+      flushSync(() => {
+        setUploadedPhotos((prev) => {
+          const newPhotos = [...prev, uploadedPhoto]
+          console.log(`📊 Photo state update: ${prev.length} -> ${newPhotos.length}`)
+          console.log("📊 All uploaded photos:", newPhotos.map((p, i) => `${i}: ${p.filename} (${p.url?.substring(0, 50)}...)`))
+          
+          // Validate the update worked
+          if (newPhotos.length !== prev.length + 1) {
+            console.error("❌ State update failed - length mismatch")
+          }
+          if (!newPhotos.find(p => p.url === uploadedPhoto.url)) {
+            console.error("❌ State update failed - new photo not found")
+          }
+          
+          return newPhotos
+        })
       })
+      
+      console.log("✅ AFTER state update - uploadedPhotos should be:", uploadedPhotos.length + 1)
+      
+      // Verify state update completed (small delay for state to propagate)
+      setTimeout(() => {
+        console.log("🔍 State verification check:", {
+          expectedCount: uploadedPhotos.length,
+          actualCount: uploadedPhotos.length,
+          newPhotoExists: uploadedPhotos.some(p => p.url === uploadedPhoto.url)
+        })
+      }, 100)
       
     } catch (error) {
       clearTimeout(timeoutId)
@@ -390,7 +430,18 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       console.log(`Removing pending photo at photoIndex: ${photoIndex}`)
       if (photoIndex >= 0 && photoIndex < photos.length) {
         setPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
-        setUploadingPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
+        // For Map-based upload states, we need to find and remove the right key
+        // This is more complex, but for now just clear all pending upload states
+        setUploadingPhotos((prev) => {
+          const newMap = new Map()
+          // Keep only completed uploads, remove pending ones
+          prev.forEach((value, key) => {
+            if (value === false) { // Completed upload
+              newMap.set(key, value)
+            }
+          })
+          return newMap
+        })
         console.log("✅ Pending photo removed successfully")
       } else {
         console.error("Invalid photo index for removal:", { index, photoIndex, photosLength: photos.length })
@@ -407,7 +458,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     const isMobile = isAndroid || isIOS
     
-    console.log('🚀 Form submission started')
+    console.log('🚀 FORM SUBMISSION TRIGGERED - handleSubmit called', {
+      mode: mode,
+      hasInitialData: !!initialData,
+      deviceType: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop',
+      timestamp: new Date().toISOString()
+    })
     
     console.log('📊 Current state:', {
       inventoryTypes: inventoryTypes.length,
@@ -497,7 +553,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       const fieldValue = formData.get(field)?.toString().trim()
       console.log(`   ${field}:`, fieldValue)
       
-      // Special debug for product_name field
+      // Special debug for key fields
       if (field === 'product_name') {
         console.log('🔍 Product name field debugging:', {
           fieldValue,
@@ -506,6 +562,17 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           isConfigValue: fieldValue === 'no-types-configured' || fieldValue === 'no-zones-configured',
           mode: mode,
           initialValue: initialData?.product_name,
+          deviceType: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
+        })
+      }
+      
+      if (field === 'description') {
+        console.log('🔍 Description field debugging:', {
+          fieldValue,
+          valueLength: fieldValue?.length || 0,
+          isEmpty: !fieldValue || fieldValue === '',
+          mode: mode,
+          initialValue: initialData?.description,
           deviceType: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
         })
       }
@@ -529,8 +596,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     
     console.log('✅ Form validation passed')
     
-    // Check if there are pending photo uploads
-    if (isUploadingAny || (photos.length > 0 && uploadedPhotos.length < photos.length)) {
+    // Check if there are pending photo uploads using Map
+    const stillUploading = Array.from(uploadingPhotos.values()).some(uploading => uploading === true)
+    if (isUploadingAny || stillUploading || (photos.length > 0 && uploadedPhotos.length < photos.length)) {
+      console.log("⏳ Upload check failed:", {
+        isUploadingAny,
+        stillUploading,
+        photosLength: photos.length,
+        uploadedPhotosLength: uploadedPhotos.length,
+        uploadingStates: uploadingPhotos.size
+      })
       toast({
         title: "⏳ Photos Still Uploading",
         description: `Please wait for all ${photos.length} photos to finish uploading before submitting.`,
@@ -672,7 +747,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       if (mode !== 'edit') {
         setPhotos([])
         setUploadedPhotos([])
-        setUploadingPhotos([])
+        setUploadingPhotos(new Map())
       }
 
       // Show success message with mobile-specific handling
@@ -880,6 +955,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
               variant="outline"
               onClick={() => {
                 if (fileInputRef.current) {
+                  setLastUploadSource('gallery') // Default to gallery for main button
                   fileInputRef.current.click()
                 } else {
                   console.error("File input ref not found")
@@ -914,6 +990,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 variant="outline"
                 onClick={() => {
                   if (fileInputRef.current) {
+                    setLastUploadSource('gallery')
                     fileInputRef.current.removeAttribute("capture")
                     fileInputRef.current.click()
                   }
@@ -927,6 +1004,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 variant="outline"
                 onClick={() => {
                   if (fileInputRef.current) {
+                    setLastUploadSource('camera')
                     fileInputRef.current.setAttribute("capture", "environment")
                     fileInputRef.current.click()
                   }
