@@ -833,7 +833,9 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           {(uploadedPhotos.length > 0 || photos.length > 0) && (
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {/* Render uploaded photos first */}
-              {uploadedPhotos.map((uploadedPhoto, index) => (
+              {uploadedPhotos.map((uploadedPhoto, index) => {
+                console.log(`Rendering uploaded photo ${index}:`, uploadedPhoto.url)
+                return (
                 <Card key={`uploaded-${index}`} className="relative">
                   <CardContent className="p-2">
                     <div className="aspect-square bg-gray-100 rounded flex items-center justify-center relative overflow-hidden">
@@ -842,6 +844,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                         alt={uploadedPhoto.filename}
                         fill
                         className="object-cover"
+                        onError={(e) => {
+                          console.error('Image load failed for:', uploadedPhoto.url, e)
+                        }}
+                        onLoad={() => {
+                          console.log('Image loaded successfully:', uploadedPhoto.url)
+                        }}
                       />
                       <Button
                         type="button"
@@ -855,7 +863,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                     </div>
                   </CardContent>
                 </Card>
-              ))}
+                )
+              })}
               
               {/* Render pending uploads */}
               {photos.map((photo, photoIndex) => {
