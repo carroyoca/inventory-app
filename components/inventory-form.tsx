@@ -874,9 +874,33 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
             id="product_name"
             name="product_name"
             placeholder="e.g., Abstract Oil Painting"
-            defaultValue={initialData?.product_name}
+            defaultValue={initialData?.product_name || ""}
             required
             className="h-11 sm:h-10"
+            onFocus={() => {
+              // Debug: Check if field has value when focused (mobile issue detection)
+              const input = document.getElementById('product_name') as HTMLInputElement
+              console.log('🔍 Product name field focused:', {
+                value: input?.value,
+                defaultValue: initialData?.product_name,
+                isEmpty: !input?.value || input?.value === '',
+                mode: mode
+              })
+            }}
+            onInvalid={(e) => {
+              // Catch HTML5 validation issues that block form submission
+              console.log('❌ Product name field validation failed:', {
+                value: (e.target as HTMLInputElement).value,
+                validationMessage: (e.target as HTMLInputElement).validationMessage,
+                mode: mode,
+                deviceType: /Android/.test(navigator.userAgent) ? 'Android' : /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Desktop'
+              })
+              toast({
+                title: "❌ Product Name Required",
+                description: "Please enter a product name before saving.",
+                variant: "destructive"
+              })
+            }}
           />
         </div>
 
@@ -1183,6 +1207,15 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           type="submit"
           disabled={isSubmitting}
           className="w-full sm:w-auto sm:min-w-32 h-12 sm:h-10 text-base sm:text-sm"
+          onClick={() => {
+            // Debug: Track button clicks to see if form submission is being attempted
+            console.log('🖱️ Submit button clicked:', {
+              isSubmitting,
+              mode: mode,
+              timestamp: new Date().toISOString(),
+              deviceType: /Android/.test(navigator.userAgent) ? 'Android' : /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Desktop'
+            })
+          }}
         >
           {isSubmitting ? (
             <>
