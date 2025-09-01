@@ -49,17 +49,10 @@ export async function middleware(request: NextRequest) {
     // Special handling for invitation pages - they require complete authentication
     const isInvitationRoute = request.nextUrl.pathname.startsWith('/invitations/')
     
-    console.log('🔍 Route analysis:', {
-      pathname: request.nextUrl.pathname,
-      isPublicRoute,
-      isInvitationRoute,
-      hasUser: !!user
-    })
     
     // For invitation routes, enforce strict authentication
     if (isInvitationRoute) {
       if (!user) {
-        console.log('🚫 Blocking unauthenticated access to invitation route:', request.nextUrl.pathname)
         const url = request.nextUrl.clone()
         url.pathname = "/auth/login"
         url.searchParams.set('redirectTo', request.nextUrl.pathname)
@@ -75,16 +68,11 @@ export async function middleware(request: NextRequest) {
       
       // If user doesn't have a complete profile, redirect to account creation
       if (!userProfile || profileError || !userProfile.email || !userProfile.full_name) {
-        console.log('🚫 User with incomplete profile trying to access invitation route:', request.nextUrl.pathname)
-        console.log('🚫 Profile data:', userProfile)
-        console.log('🚫 Profile error:', profileError)
-        
         // Clear any invalid session
         try {
           await supabase.auth.signOut()
-          console.log('🔒 Cleared invalid session in invitation route middleware')
         } catch (signOutError) {
-          console.log('⚠️ Error clearing session in invitation route middleware:', signOutError)
+          console.error('Error clearing session in invitation route middleware:', signOutError)
         }
         
         const url = request.nextUrl.clone()
@@ -94,7 +82,6 @@ export async function middleware(request: NextRequest) {
       
       // For authenticated users on invitation routes, we'll let the page handle profile validation
       // The page will check if the user has a complete profile and redirect accordingly
-      console.log('✅ Authenticated user with complete profile accessing invitation route:', request.nextUrl.pathname)
       return supabaseResponse
     }
     
@@ -109,16 +96,11 @@ export async function middleware(request: NextRequest) {
       
       // If user doesn't have a complete profile, redirect to profile completion
       if (!userProfile || profileError || !userProfile.email || !userProfile.full_name) {
-        console.log('🚫 User with incomplete profile trying to access:', request.nextUrl.pathname)
-        console.log('🚫 Profile data:', userProfile)
-        console.log('🚫 Profile error:', profileError)
-        
         // Clear any invalid session
         try {
           await supabase.auth.signOut()
-          console.log('🔒 Cleared invalid session in middleware')
         } catch (signOutError) {
-          console.log('⚠️ Error clearing session in middleware:', signOutError)
+          console.error('Error clearing session in middleware:', signOutError)
         }
         
         const url = request.nextUrl.clone()
@@ -129,7 +111,6 @@ export async function middleware(request: NextRequest) {
     
     // Redirect unauthenticated users to login (except for public routes)
     if (!user && !isPublicRoute) {
-      console.log('🚫 Redirecting unauthenticated user from:', request.nextUrl.pathname)
       const url = request.nextUrl.clone()
       url.pathname = "/auth/login"
       return NextResponse.redirect(url)
@@ -173,9 +154,6 @@ export async function middleware(request: NextRequest) {
       }
     }
 
-    // Log the request for debugging
-    console.log('Middleware processing:', request.nextUrl.pathname, 'User:', user?.id || 'unauthenticated')
-    
     return supabaseResponse
   } catch (error) {
     console.error("Middleware error:", error)

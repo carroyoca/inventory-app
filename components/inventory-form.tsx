@@ -135,9 +135,9 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     loadCategories()
   }, [activeProject])
 
-  // Initialize form with existing data in edit mode
+  // Initialize form with existing data in edit mode (only once)
   useEffect(() => {
-    if (mode === 'edit' && initialData) {
+    if (mode === 'edit' && initialData && uploadedPhotos.length === 0) {
       // Convert existing photo URLs to UploadedPhoto format
       const existingPhotos: UploadedPhoto[] = initialData.photos.map((url, index) => ({
         url,
@@ -147,7 +147,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }))
       setUploadedPhotos(existingPhotos)
     }
-  }, [mode, initialData])
+  }, [mode, initialData, uploadedPhotos.length])
 
   const handlePhotoUpload = async (files: FileList) => {
     console.log("Photo upload started with", files.length, "files")
@@ -193,37 +193,18 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         })
       }
       
-      let uploadSuccess = false
-      
-      // Try device-specific upload methods
-      if (isIOS) {
-        console.log("iOS detected, trying iOS-specific upload method")
-        try {
-          uploadSuccess = await uploadFileIOS(file)
-        } catch (error) {
-          console.log("iOS alternative upload failed, falling back to standard method")
-        }
-      } else if (isAndroid) {
-        console.log("Android detected, trying Android-specific upload method")
-        try {
-          uploadSuccess = await uploadFileAndroid(file)
-        } catch (error) {
-          console.log("Android alternative upload failed, falling back to standard method")
-        }
-      }
-      
-      if (!uploadSuccess) {
-        // Standard upload method
-        try {
-          await uploadFileStandard(file)
-        } catch (error) {
-          console.error("Standard upload also failed:", error)
-          toast({
-            title: "Upload Failed",
-            description: `Failed to upload ${file.name}. Please try again or contact support.`,
-            variant: "destructive"
-          })
-        }
+      // Use unified upload method for all devices
+      try {
+        console.log(`Uploading file for ${isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'}: ${file.name}`)
+        await uploadFileUnified(file)
+        console.log(`✅ Successfully uploaded: ${file.name}`)
+      } catch (error) {
+        console.error(`❌ Upload failed for ${file.name}:`, error)
+        toast({
+          title: "Upload Failed",
+          description: `Failed to upload ${file.name}. Please try again.`,
+          variant: "destructive"
+        })
       }
       
       // Mark this specific photo upload as complete
@@ -241,152 +222,66 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     setIsUploadingAny(false)
   }
 
-  const uploadFileIOS = async (file: File): Promise<boolean> => {
-    try {
-      console.log("Attempting iOS-specific upload for:", file.name)
+  const uploadFileUnified = async (file: File) => {
+    const supabase = createClient()
+    
+    // Get authentication token with automatic retry for mobile
+    let session = null
+    let retryCount = 0
+    const maxRetries = 3
+    
+    while (retryCount < maxRetries) {
+      const { data: { session: currentSession }, error } = await supabase.auth.getSession()
       
-      // Get authentication token
-      const supabase = createClient()
-      const { data: { session } } = await supabase.auth.getSession()
-      
-      if (!session?.access_token) {
-        console.log("No access token for iOS upload")
-        return false
+      if (error) {
+        console.warn(`Session error on attempt ${retryCount + 1}:`, error)
       }
       
-      // Create a new FormData for iOS
-      const formData = new FormData()
-      formData.append("file", file, file.name) // Explicitly set filename
-      
-      // Add additional headers that might help with iOS
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-          // Don't set Content-Type for FormData on iOS
-        },
-        body: formData
-      })
-      
-      if (!response.ok) {
-        throw new Error(`Upload failed with status: ${response.status}`)
-      }
-      
-      const uploadedPhoto: UploadedPhoto = await response.json()
-      console.log("iOS upload successful:", uploadedPhoto)
-      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
-      return true
-      
-    } catch (error) {
-      console.error("iOS upload failed:", error)
-      return false
-    }
-  }
-
-  const uploadFileAndroid = async (file: File): Promise<boolean> => {
-    try {
-      console.log("Attempting Android-specific upload for:", file.name)
-      
-      // Get authentication token with retry logic
-      const supabase = createClient()
-      let session = null
-      let retryCount = 0
-      
-      while (retryCount < 3) {
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
+      if (currentSession?.access_token) {
         session = currentSession
-        
-        if (session?.access_token) {
-          console.log("✅ Android: Got valid session token")
+        console.log(`✅ Got valid session token on attempt ${retryCount + 1}`)
+        break
+      }
+      
+      console.log(`⚠️ No valid session token, attempt ${retryCount + 1}/${maxRetries}`)
+      retryCount++
+      
+      if (retryCount < maxRetries) {
+        // Try to refresh the session
+        const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
+        if (refreshedSession?.access_token) {
+          session = refreshedSession
+          console.log("✅ Successfully refreshed session")
           break
         }
-        
-        console.log(`⚠️ Android: No session token, retry ${retryCount + 1}/3`)
-        retryCount++
-        
-        if (retryCount < 3) {
-          // Try to refresh the session
-          const { data: { session: refreshedSession } } = await supabase.auth.refreshSession()
-          session = refreshedSession
-          await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second
-        }
+        await new Promise(resolve => setTimeout(resolve, 1000)) // Wait 1 second before retry
       }
-      
-      if (!session?.access_token) {
-        console.log("❌ Android: Failed to get valid session after retries")
-        toast({
-          title: "Authentication Error",
-          description: "Please refresh the page and try again",
-          variant: "destructive"
-        })
-        return false
-      }
-      
-      // Detect Samsung Browser for special handling
-      const isSamsungBrowser = /SamsungBrowser/.test(navigator.userAgent)
-      console.log("📱 Samsung Browser detected:", isSamsungBrowser)
-      
-      // Create a new FormData for Android with explicit file handling
-      const formData = new FormData()
-      formData.append("file", file, file.name) // Explicitly set filename
-      
-      // Add additional headers that might help with Android
-      const response = await fetch("/api/upload", {
-        method: "POST",
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`
-          // Don't set Content-Type for FormData on Android
-        },
-        body: formData
-      })
-      
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Android upload failed:", errorData)
-        throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
-      }
-      
-      const uploadedPhoto: UploadedPhoto = await response.json()
-      console.log("Android upload successful:", uploadedPhoto)
-      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
-      return true
-      
-    } catch (error) {
-      console.error("Android upload failed:", error)
-      return false
     }
-  }
-
-  const uploadFileStandard = async (file: File): Promise<void> => {
-    console.log("Using standard upload method for:", file.name)
-    
-    // Get authentication token
-    const supabase = createClient()
-    const { data: { session } } = await supabase.auth.getSession()
     
     if (!session?.access_token) {
-      throw new Error("Authentication required for photo upload")
+      throw new Error("Unable to authenticate. Please try logging in again.")
     }
     
+    // Create FormData with explicit filename to ensure compatibility
     const formData = new FormData()
-    formData.append("file", file)
+    formData.append("file", file, file.name)
     
-    // Log FormData contents for debugging
-    console.log("FormData created with file:", file.name)
-    for (let [key, value] of formData.entries()) {
-      console.log("FormData entry:", key, value)
-    }
-
-    // Add timeout for mobile uploads
+    // Add timeout for all uploads (especially important for mobile)
     const controller = new AbortController()
-    const timeoutId = setTimeout(() => controller.abort(), 60000) // 60 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 120000) // 2 minute timeout
     
     try {
-      console.log("Sending upload request to /api/upload with auth")
+      console.log("Sending unified upload request:", {
+        filename: file.name,
+        size: file.size,
+        type: file.type
+      })
+      
       const response = await fetch("/api/upload", {
         method: "POST",
         headers: {
           'Authorization': `Bearer ${session.access_token}`
+          // Don't set Content-Type - let browser set it for FormData
         },
         body: formData,
         signal: controller.signal
@@ -394,29 +289,37 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       
       clearTimeout(timeoutId)
 
-      console.log("Upload response status:", response.status)
-      console.log("Upload response headers:", response.headers)
-
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}))
-        console.error("Upload failed with error data:", errorData)
+        const errorData = await response.json().catch(() => ({ error: `HTTP ${response.status}` }))
+        console.error("Upload failed:", errorData)
         throw new Error(errorData.error || `Upload failed with status: ${response.status}`)
       }
 
       const uploadedPhoto: UploadedPhoto = await response.json()
       console.log("Upload successful:", uploadedPhoto)
-      setUploadedPhotos((prev) => [...prev, uploadedPhoto])
+      
+      // Update state atomically to prevent race conditions
+      setUploadedPhotos((prev) => {
+        const newPhotos = [...prev, uploadedPhoto]
+        console.log(`Updated uploadedPhotos: ${prev.length} -> ${newPhotos.length}`)
+        return newPhotos
+      })
+      
     } catch (error) {
-      console.error("Upload error in uploadFileStandard:", error)
+      clearTimeout(timeoutId)
+      console.error("Upload error:", error)
       throw error
     }
   }
 
   const removePhoto = async (index: number) => {
+    console.log(`Removing photo at index ${index}. Uploaded photos: ${uploadedPhotos.length}, Pending photos: ${photos.length}`)
+    
     // Check if this index refers to an uploaded photo or a pending photo
     if (index < uploadedPhotos.length) {
       // This is an uploaded photo
       const uploadedPhoto = uploadedPhotos[index]
+      console.log(`Removing uploaded photo: ${uploadedPhoto.url}`)
       try {
         await fetch("/api/delete-photo", {
           method: "DELETE",
@@ -424,6 +327,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           body: JSON.stringify({ url: uploadedPhoto.url }),
         })
         setUploadedPhotos((prev) => prev.filter((_, i) => i !== index))
+        console.log("✅ Uploaded photo removed successfully")
       } catch (error) {
         console.error("Error deleting uploaded photo:", error)
         toast({
@@ -435,47 +339,17 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     } else {
       // This is a pending photo (not yet uploaded)
       const photoIndex = index - uploadedPhotos.length
-      setPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
-      setUploadingPhotos((prev) => {
-        const newStates = [...prev]
-        newStates.splice(index, 1)
-        return newStates
-      })
+      console.log(`Removing pending photo at photoIndex: ${photoIndex}`)
+      if (photoIndex >= 0 && photoIndex < photos.length) {
+        setPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
+        setUploadingPhotos((prev) => prev.filter((_, i) => i !== photoIndex))
+        console.log("✅ Pending photo removed successfully")
+      } else {
+        console.error("Invalid photo index for removal:", { index, photoIndex, photosLength: photos.length })
+      }
     }
   }
 
-  // Add session refresh function for mobile users
-  const refreshSession = async () => {
-    try {
-      const supabase = createClient()
-      const { data: { session }, error } = await supabase.auth.refreshSession()
-      
-      if (error) {
-        console.error("Session refresh failed:", error)
-        toast({
-          title: "Session Error",
-          description: "Please log in again",
-          variant: "destructive"
-        })
-        return false
-      }
-      
-      if (session) {
-        console.log("✅ Session refreshed successfully")
-        toast({
-          title: "Session Refreshed",
-          description: "You can now upload photos",
-          variant: "default"
-        })
-        return true
-      }
-      
-      return false
-    } catch (error) {
-      console.error("Session refresh error:", error)
-      return false
-    }
-  }
 
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault()
@@ -1102,23 +976,6 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       </div>
 
       <div className="pt-4">
-        {/* Mobile Session Refresh Button */}
-        {/Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) && (
-          <div className="mb-4">
-            <Button 
-              type="button" 
-              variant="outline" 
-              onClick={refreshSession}
-              className="w-full sm:w-auto"
-            >
-              🔄 Refresh Session
-            </Button>
-            <p className="text-xs text-gray-500 mt-1">
-              If you're having trouble uploading photos, try refreshing your session
-            </p>
-          </div>
-        )}
-        
         <Button
           type="submit"
           disabled={isSubmitting}

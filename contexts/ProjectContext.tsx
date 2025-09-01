@@ -21,18 +21,11 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   // Función para obtener el proyecto activo del usuario
   const getActiveProject = async () => {
-    console.log('🔄 ProjectContext: getActiveProject called')
-    console.log('🔄 ProjectContext: Starting getActiveProject execution...')
     try {
       const supabase = createClient()
-      console.log('🔄 ProjectContext: About to get session...')
       const { data: { session } } = await supabase.auth.getSession()
-      console.log('🔄 ProjectContext: Session result:', !!session?.user)
-      
-      console.log('🔄 ProjectContext: Session check:', !!session?.user)
       
       if (!session?.user) {
-        console.log('🔄 ProjectContext: No session, setting loading false')
         setIsLoading(false)
         setActiveProject(null)
         return
@@ -58,8 +51,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .order('joined_at', { ascending: false })
         .limit(1)
 
-      console.log('🔄 ProjectContext: Projects query result:', { projects: projects?.length || 0, error })
-
       if (error) {
         console.error('Error fetching active project:', error)
         setIsLoading(false)
@@ -71,8 +62,6 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         const projectData = projects[0]
         
         // Get actual member count using API endpoint (bypasses RLS restrictions)
-        console.log('🔄 ProjectContext: Fetching member counts for project:', projectData.project_id)
-        
         let memberCount = 1 // fallback to 1 if API fails
         try {
           const { data: { session } } = await supabase.auth.getSession()
@@ -86,13 +75,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
             if (response.ok) {
               const memberData = await response.json()
               memberCount = memberData.totalMemberCount
-              console.log('🔢 ProjectContext: Member count from API:', memberData)
-            } else {
-              console.warn('⚠️ ProjectContext: Member count API failed, using fallback')
             }
           }
         } catch (error) {
-          console.warn('⚠️ ProjectContext: Member count API error, using fallback:', error)
+          // Silent fallback to default count
         }
         
         const project = {
@@ -106,32 +92,26 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           }],
           member_count: memberCount || 1
         } as any
-        console.log('🔄 ProjectContext: Setting active project:', project.name, 'with', memberCount, 'members')
-        console.log('🔄 ProjectContext: Full project object:', { ...project, members: '[hidden]' })
         setActiveProject(project)
       } else {
-        console.log('🔄 ProjectContext: No projects found, setting activeProject to null')
         setActiveProject(null)
       }
     } catch (error) {
       console.error('Error in getActiveProject:', error)
       setActiveProject(null)
     } finally {
-      console.log('🔄 ProjectContext: Setting isLoading to false')
       setIsLoading(false)
     }
   }
 
   // Función para refrescar el proyecto activo
   const refreshActiveProject = async () => {
-    console.log('🔄 ProjectContext: refreshActiveProject called')
     setIsLoading(true)
     await getActiveProject()
   }
 
   // Función para cambiar a un proyecto específico
   const switchToProject = async (projectId: string) => {
-    console.log('🔄 ProjectContext: switchToProject called with projectId:', projectId)
     try {
       setIsLoading(true)
       const supabase = createClient()
@@ -141,10 +121,7 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         throw new Error("No authenticated user")
       }
 
-      console.log('🔄 ProjectContext: Session validated, fetching project data...')
-
       // Obtener el proyecto específico
-      console.log('🔄 ProjectContext: Querying with user_id:', session.user.id, 'project_id:', projectId)
       const { data: projects, error } = await supabase
         .from('project_members')
         .select(`
@@ -164,11 +141,8 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         .eq('project_id', projectId)
         .single()
 
-      console.log('🔄 ProjectContext: Database query result:', { projects: !!projects, error })
-
       if (error) {
-        console.error('❌ ProjectContext: Database error:', error)
-        console.error('❌ ProjectContext: Error details:', JSON.stringify(error, null, 2))
+        console.error('Database error in switchToProject:', error)
         
         // If it's an RLS error, try to provide more helpful information
         if (error.message?.includes('row-level security') || error.code === 'PGRST116') {
@@ -200,13 +174,10 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           if (response.ok) {
             const memberData = await response.json()
             memberCount = memberData.totalMemberCount
-            console.log('🔢 ProjectContext: Member count from API (switchToProject):', memberData)
-          } else {
-            console.warn('⚠️ ProjectContext: Member count API failed, using fallback')
           }
         }
       } catch (error) {
-        console.warn('⚠️ ProjectContext: Member count API error, using fallback:', error)
+        // Silent fallback to default count
       }
       
       const project = {
@@ -221,30 +192,25 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
         member_count: memberCount || 1
       } as any
 
-      console.log('✅ ProjectContext: Successfully prepared project data:', project.name, 'with', memberCount, 'members')
       setActiveProject(project)
       
     } catch (error) {
-      console.error('❌ ProjectContext: Error in switchToProject:', error)
+      console.error('Error in switchToProject:', error)
       setIsLoading(false) // Ensure loading is set to false on error
       throw error
     } finally {
-      console.log('🔄 ProjectContext: switchToProject completed, setting isLoading to false')
       setIsLoading(false)
     }
   }
 
   // Función para limpiar el estado (útil para logout)
   const clearProjectState = () => {
-    console.log('🔄 ProjectContext: clearProjectState called')
     setActiveProject(null)
     setIsLoading(false)
   }
 
   // Cargar proyecto activo y escuchar cambios de autenticación
   useEffect(() => {
-    console.log('🔄 ProjectContext: Initial useEffect triggered')
-    
     // Add a small delay to ensure the component is fully mounted
     const timer = setTimeout(() => {
       getActiveProject()
@@ -254,27 +220,20 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const supabase = createClient()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
-        console.log('🔄 ProjectContext: Auth state changed:', event, !!session?.user)
-        
         if (event === 'SIGNED_OUT') {
-          console.log('🔄 ProjectContext: User signed out, clearing state')
           setActiveProject(null)
           setIsLoading(false)
         } else if (event === 'SIGNED_IN' && session?.user) {
-          console.log('🔄 ProjectContext: User signed in, refreshing project')
           getActiveProject()
         }
       }
     )
 
     return () => {
-      console.log('🔄 ProjectContext: Cleaning up auth listener')
       clearTimeout(timer)
       subscription.unsubscribe()
     }
   }, [])
-
-  console.log('🔄 ProjectContext: Rendering with state:', { activeProject: !!activeProject, isLoading })
 
   const value: ProjectContextType = {
     activeProject,
