@@ -150,14 +150,24 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   }, [mode, initialData, uploadedPhotos.length])
 
   const handlePhotoUpload = async (files: FileList) => {
-    console.log("Photo upload started with", files.length, "files")
+    console.log("📸 Photo upload started with", files.length, "files")
     
     // Detect device type for better handling
     const isAndroid = /Android/.test(navigator.userAgent)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     const isMobile = isAndroid || isIOS
     
-    console.log("Device detection:", { isAndroid, isIOS, isMobile })
+    console.log("📱 Device detection:", { isAndroid, isIOS, isMobile, mode, hasInitialData: !!initialData })
+    
+    // CRITICAL DEBUG: Check if we're in edit mode with existing photos
+    if (mode === 'edit' && initialData) {
+      console.log("🔄 EDIT MODE photo upload:", {
+        existingPhotos: initialData.photos?.length || 0,
+        currentUploadedPhotos: uploadedPhotos.length,
+        newFilesToUpload: files.length,
+        uploadingStates: uploadingPhotos.length
+      })
+    }
     
     // Convert FileList to Array for better mobile handling
     const fileArray = Array.from(files)
@@ -167,7 +177,19 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     
     // Initialize upload states for new photos
     const newUploadStates = new Array(fileArray.length).fill(true)
-    setUploadingPhotos((prev) => [...prev, ...newUploadStates])
+    const startingUploadIndex = uploadingPhotos.length // Capture the starting index BEFORE state updates
+    
+    setUploadingPhotos((prev) => {
+      const updatedStates = [...prev, ...newUploadStates]
+      console.log("📊 Upload states updated:", {
+        previousStates: prev.length,
+        newStates: newUploadStates.length,
+        totalStates: updatedStates.length,
+        startingIndex: startingUploadIndex,
+        mode: mode
+      })
+      return updatedStates
+    })
     setIsUploadingAny(true)
 
     // Upload each file sequentially to avoid race conditions
@@ -208,11 +230,22 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }
       
       // Mark this specific photo upload as complete
-      const currentUploadIndex = uploadedPhotos.length + i
+      // FIXED: Use the captured starting index to avoid state race conditions
+      const uploadStateIndex = startingUploadIndex + i
+      console.log("🔄 Marking upload complete (FIXED v2):", {
+        fileIndex: i,
+        startingUploadIndex,
+        uploadStateIndex,
+        mode: mode
+      })
+      
       setUploadingPhotos((prev) => {
         const newStates = [...prev]
-        if (currentUploadIndex >= 0 && currentUploadIndex < newStates.length) {
-          newStates[currentUploadIndex] = false
+        if (uploadStateIndex >= 0 && uploadStateIndex < newStates.length) {
+          newStates[uploadStateIndex] = false
+          console.log("✅ Upload state marked complete at index", uploadStateIndex)
+        } else {
+          console.log("⚠️ Upload index out of bounds:", uploadStateIndex, "vs length", newStates.length)
         }
         return newStates
       })
@@ -296,12 +329,27 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       }
 
       const uploadedPhoto: UploadedPhoto = await response.json()
-      console.log("Upload successful:", uploadedPhoto)
+      console.log("✅ Upload successful:", uploadedPhoto)
+      
+      // Detect if this was a camera or gallery upload
+      const isCamera = file.name.toLowerCase().includes('image') || file.name.toLowerCase().includes('camera')
+      const deviceType = /Android/.test(navigator.userAgent) ? 'Android' : /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Desktop'
+      
+      console.log("📸 Photo upload details:", {
+        fileName: file.name,
+        fileSize: file.size,
+        fileType: file.type,
+        deviceType,
+        isCamera,
+        blobUrl: uploadedPhoto.url,
+        urlLength: uploadedPhoto.url?.length || 0
+      })
       
       // Update state atomically to prevent race conditions
       setUploadedPhotos((prev) => {
         const newPhotos = [...prev, uploadedPhoto]
-        console.log(`Updated uploadedPhotos: ${prev.length} -> ${newPhotos.length}`)
+        console.log(`📊 Photo state update: ${prev.length} -> ${newPhotos.length}`)
+        console.log("📊 All uploaded photos:", newPhotos.map((p, i) => `${i}: ${p.filename} (${p.url?.substring(0, 50)}...)`))
         return newPhotos
       })
       
@@ -410,11 +458,28 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       // Manually capture form values for mobile
       const form = e.currentTarget
       const formElements = form.elements
+      const mobileFormData: Record<string, string> = {}
       
       for (let i = 0; i < formElements.length; i++) {
         const element = formElements[i] as HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
         if (element.name && element.value) {
+          mobileFormData[element.name] = element.value
           console.log(`📱 Mobile form field: ${element.name} = ${element.value}`)
+        }
+      }
+      
+      // Special check for product_name field on mobile
+      if (mobileFormData.product_name) {
+        console.log('📱 Mobile product_name captured:', {
+          value: mobileFormData.product_name,
+          length: mobileFormData.product_name.length,
+          matches_formdata: formData.get("product_name") === mobileFormData.product_name
+        })
+        
+        // If FormData extraction failed but manual capture succeeded, use manual value
+        if (!formData.get("product_name") && mobileFormData.product_name) {
+          console.log('📱 Fixing mobile FormData extraction for product_name')
+          formData.set("product_name", mobileFormData.product_name)
         }
       }
     }
@@ -431,6 +496,20 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     for (const [field, label] of Object.entries(requiredFields)) {
       const fieldValue = formData.get(field)?.toString().trim()
       console.log(`   ${field}:`, fieldValue)
+      
+      // Special debug for product_name field
+      if (field === 'product_name') {
+        console.log('🔍 Product name field debugging:', {
+          fieldValue,
+          valueLength: fieldValue?.length || 0,
+          isEmpty: !fieldValue || fieldValue === '',
+          isConfigValue: fieldValue === 'no-types-configured' || fieldValue === 'no-zones-configured',
+          mode: mode,
+          initialValue: initialData?.product_name,
+          deviceType: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
+        })
+      }
+      
       if (!fieldValue || fieldValue === '' || 
           fieldValue === 'no-types-configured' || 
           fieldValue === 'no-zones-configured') {
@@ -506,15 +585,47 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         photos: photoUrls,
         project_id: activeProject.id,
       }
+      
+      console.log('📦 Item data constructed:', {
+        product_name: itemData.product_name,
+        product_name_length: itemData.product_name?.toString().length || 0,
+        product_name_type: typeof itemData.product_name,
+        all_fields: Object.keys(itemData),
+        mode: mode,
+        project_id: activeProject.id
+      })
+      
+      // Special validation for product_name in edit mode
+      if (mode === 'edit' && initialData) {
+        console.log('🔄 Edit mode comparison:', {
+          original_product_name: initialData.product_name,
+          new_product_name: itemData.product_name,
+          changed: initialData.product_name !== itemData.product_name
+        })
+      }
 
       let error
       if (mode === 'edit' && initialData) {
         // Update existing item
-        const { error: updateError } = await supabase
+        console.log('🔄 Updating existing item:', {
+          itemId: initialData.id,
+          projectId: activeProject.id,
+          product_name_update: itemData.product_name,
+          fieldsToUpdate: Object.keys(itemData)
+        })
+        
+        const { error: updateError, data: updateData } = await supabase
           .from("inventory_items")
           .update(itemData)
           .eq('id', initialData.id)
           .eq('project_id', activeProject.id)
+          .select() // Add select to see what was actually updated
+        
+        console.log('📊 Database update result:', {
+          error: updateError,
+          updatedData: updateData,
+          success: !updateError
+        })
         
         error = updateError
       } else {
@@ -834,7 +945,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
               {/* Render uploaded photos first */}
               {uploadedPhotos.map((uploadedPhoto, index) => {
-                console.log(`Rendering uploaded photo ${index}:`, uploadedPhoto.url)
+                console.log(`🖼️ Rendering photo ${index}:`, {
+                  filename: uploadedPhoto.filename,
+                  url: uploadedPhoto.url,
+                  urlValid: uploadedPhoto.url && uploadedPhoto.url.length > 0,
+                  isBlob: uploadedPhoto.url?.includes('blob.vercel-storage.com'),
+                  fileType: uploadedPhoto.type
+                })
                 return (
                 <Card key={`uploaded-${index}`} className="relative">
                   <CardContent className="p-2">
@@ -845,10 +962,18 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                         fill
                         className="object-cover"
                         onError={(e) => {
-                          console.error('Image load failed for:', uploadedPhoto.url, e)
+                          console.error('❌ Image load failed:', {
+                            url: uploadedPhoto.url,
+                            filename: uploadedPhoto.filename,
+                            error: e,
+                            deviceType: /Android/.test(navigator.userAgent) ? 'Android' : /iPad|iPhone|iPod/.test(navigator.userAgent) ? 'iOS' : 'Desktop'
+                          })
                         }}
                         onLoad={() => {
-                          console.log('Image loaded successfully:', uploadedPhoto.url)
+                          console.log('✅ Image loaded successfully:', {
+                            url: uploadedPhoto.url,
+                            filename: uploadedPhoto.filename
+                          })
                         }}
                       />
                       <Button
