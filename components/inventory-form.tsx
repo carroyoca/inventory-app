@@ -167,7 +167,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         existingPhotos: initialData.photos?.length || 0,
         currentUploadedPhotos: uploadedPhotos.length,
         newFilesToUpload: files.length,
-        uploadingStates: uploadingPhotos.length
+        uploadingStates: uploadingPhotos.size
       })
     }
     
@@ -1095,8 +1095,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
               
               {/* Render pending uploads */}
               {photos.map((photo, photoIndex) => {
-                const uploadIndex = uploadedPhotos.length + photoIndex
-                const isUploading = uploadingPhotos[uploadIndex]
+                // For Map-based system, just check if any uploads are in progress
+                const isUploading = isUploadingAny
 
                 return (
                   <Card key={`pending-${photoIndex}`} className="relative">
