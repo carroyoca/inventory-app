@@ -73,6 +73,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const [lastUploadSource, setLastUploadSource] = useState<'camera' | 'gallery' | null>(null)
   const router = useRouter()
   const fileInputRef = useRef<HTMLInputElement>(null)
+  // Use ref to track photos immediately without state closure issues
+  const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
   const { activeProject } = useProject()
 
   // Load project categories
@@ -148,6 +150,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         type: 'image/jpeg'
       }))
       setUploadedPhotos(existingPhotos)
+      // CRITICAL: Also update the ref immediately
+      uploadedPhotosRef.current = existingPhotos
+      console.log("🔧 Initialized photos in edit mode:", {
+        count: existingPhotos.length,
+        refCount: uploadedPhotosRef.current.length,
+        mode: mode
+      })
     }
   }, [mode, initialData, uploadedPhotos.length])
 
@@ -199,76 +208,68 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     })
     setIsUploadingAny(true)
 
-    // Upload each file sequentially to avoid race conditions
-    for (let i = 0; i < fileArray.length; i++) {
-      const file = fileArray[i]
-      const fileKey = fileKeys[i]
+    // Upload all files in parallel using Promise.all for better completion tracking
+    try {
+      console.log("🚀 Starting parallel upload of", fileArray.length, "files")
       
-      console.log("Processing file for upload:", {
-        index: i,
-        fileKey,
-        name: file.name,
-        size: file.size,
-        type: file.type,
-        sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB",
-        device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
-      })
-      
-      // Check file size for mobile
-      const fileSizeMB = file.size / (1024 * 1024)
-      if (fileSizeMB > 50) {
-        console.warn("Large file detected:", fileSizeMB.toFixed(2) + " MB")
-        toast({
-          title: "Large File Warning",
-          description: `File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`,
-          variant: "default"
+      const uploadPromises = fileArray.map(async (file, i) => {
+        const fileKey = fileKeys[i]
+        
+        console.log("Processing file for upload:", {
+          index: i,
+          fileKey,
+          name: file.name,
+          size: file.size,
+          type: file.type,
+          sizeInMB: (file.size / (1024 * 1024)).toFixed(2) + " MB",
+          device: isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'
         })
-      }
-      
-      // Use unified upload method for all devices
-      try {
+        
+        // Check file size for mobile
+        const fileSizeMB = file.size / (1024 * 1024)
+        if (fileSizeMB > 50) {
+          console.warn("Large file detected:", fileSizeMB.toFixed(2) + " MB")
+          toast({
+            title: "Large File Warning",
+            description: `File ${file.name} is very large (${fileSizeMB.toFixed(2)} MB). This might cause issues on mobile.`,
+            variant: "default"
+          })
+        }
+        
+        // Upload the file
         console.log(`Uploading file for ${isMobile ? (isAndroid ? 'Android' : 'iOS') : 'Desktop'}: ${file.name}`)
         await uploadFileUnified(file)
         console.log(`✅ Successfully uploaded: ${file.name}`)
-      } catch (error) {
-        console.error(`❌ Upload failed for ${file.name}:`, error)
-        toast({
-          title: "Upload Failed",
-          description: `Failed to upload ${file.name}. Please try again.`,
-          variant: "destructive"
+        
+        // Mark this specific photo upload as complete using Map
+        setUploadingPhotos((prev) => {
+          const newMap = new Map(prev)
+          if (newMap.has(fileKey)) {
+            newMap.set(fileKey, false)
+            console.log("✅ Upload state marked complete for key", fileKey)
+          }
+          return newMap
         })
-      }
-      
-      // Mark this specific photo upload as complete using Map
-      console.log("🔄 Marking upload complete (Map-based):", {
-        fileIndex: i,
-        fileKey,
-        mode: mode
+        
+        return file.name
       })
       
-      setUploadingPhotos((prev) => {
-        const newMap = new Map(prev)
-        if (newMap.has(fileKey)) {
-          newMap.set(fileKey, false)
-          console.log("✅ Upload state marked complete for key", fileKey)
-        } else {
-          console.log("⚠️ File key not found in upload states:", fileKey)
-        }
-        return newMap
+      // Wait for all uploads to complete
+      const completedUploads = await Promise.all(uploadPromises)
+      console.log("🎉 All uploads completed successfully:", completedUploads)
+      
+      // All uploads complete
+      setIsUploadingAny(false)
+      
+    } catch (error) {
+      console.error("❌ Upload batch failed:", error)
+      setIsUploadingAny(false)
+      toast({
+        title: "Upload Failed",
+        description: "One or more photo uploads failed. Please try again.",
+        variant: "destructive"
       })
     }
-
-    // All uploads complete - check if any are still uploading
-    setTimeout(() => {
-      setUploadingPhotos((prev) => {
-        const stillUploading = Array.from(prev.values()).some(uploading => uploading === true)
-        if (!stillUploading) {
-          setIsUploadingAny(false)
-          console.log("🎉 All uploads completed!")
-        }
-        return prev
-      })
-    }, 100)
   }
 
   const uploadFileUnified = async (file: File) => {
@@ -361,37 +362,29 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         urlLength: uploadedPhoto.url?.length || 0
       })
       
-      // Update state with React flushSync to ensure immediate update on mobile
-      console.log("🔄 BEFORE state update - current uploadedPhotos:", uploadedPhotos.length)
+      // CRITICAL FIX: Update ref immediately (no state closure issues)
+      uploadedPhotosRef.current = [...uploadedPhotosRef.current, uploadedPhoto]
       
+      console.log("🔄 IMMEDIATE ref update:", {
+        before: uploadedPhotosRef.current.length - 1,
+        after: uploadedPhotosRef.current.length,
+        newPhotoUrl: uploadedPhoto.url?.substring(0, 50) + "..."
+      })
+      
+      // Update state for UI rendering (with flushSync for mobile)
       flushSync(() => {
         setUploadedPhotos((prev) => {
           const newPhotos = [...prev, uploadedPhoto]
-          console.log(`📊 Photo state update: ${prev.length} -> ${newPhotos.length}`)
-          console.log("📊 All uploaded photos:", newPhotos.map((p, i) => `${i}: ${p.filename} (${p.url?.substring(0, 50)}...)`))
-          
-          // Validate the update worked
-          if (newPhotos.length !== prev.length + 1) {
-            console.error("❌ State update failed - length mismatch")
-          }
-          if (!newPhotos.find(p => p.url === uploadedPhoto.url)) {
-            console.error("❌ State update failed - new photo not found")
-          }
-          
+          console.log(`📊 State update for UI: ${prev.length} -> ${newPhotos.length}`)
           return newPhotos
         })
       })
       
-      console.log("✅ AFTER state update - uploadedPhotos should be:", uploadedPhotos.length + 1)
-      
-      // Verify state update completed (small delay for state to propagate)
-      setTimeout(() => {
-        console.log("🔍 State verification check:", {
-          expectedCount: uploadedPhotos.length,
-          actualCount: uploadedPhotos.length,
-          newPhotoExists: uploadedPhotos.some(p => p.url === uploadedPhoto.url)
-        })
-      }, 100)
+      console.log("✅ Photo successfully tracked:", {
+        refCount: uploadedPhotosRef.current.length,
+        stateCount: uploadedPhotos.length + 1,
+        refHasNewPhoto: uploadedPhotosRef.current.some(p => p.url === uploadedPhoto.url)
+      })
       
     } catch (error) {
       clearTimeout(timeoutId)
@@ -414,8 +407,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ url: uploadedPhoto.url }),
         })
+        // Update both state and ref
         setUploadedPhotos((prev) => prev.filter((_, i) => i !== index))
-        console.log("✅ Uploaded photo removed successfully")
+        uploadedPhotosRef.current = uploadedPhotosRef.current.filter((_, i) => i !== index)
+        console.log("✅ Uploaded photo removed successfully", {
+          newStateCount: uploadedPhotos.length - 1,
+          newRefCount: uploadedPhotosRef.current.length
+        })
       } catch (error) {
         console.error("Error deleting uploaded photo:", error)
         toast({
@@ -638,11 +636,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         throw new Error("You must select a project before adding inventory items")
       }
 
-      // Use current uploadedPhotos state (reflects all additions and deletions)
-      const photoUrls = uploadedPhotos.map((photo) => photo.url)
-      console.log('📝 Using current photo state:', {
-        uploadedPhotosCount: uploadedPhotos.length,
+      // CRITICAL FIX: Use ref instead of state to avoid closure issues
+      const photoUrls = uploadedPhotosRef.current.map((photo) => photo.url)
+      console.log('📝 Using ref for photo URLs (FIXED):', {
+        refPhotosCount: uploadedPhotosRef.current.length,
+        statePhotosCount: uploadedPhotos.length,
         photoUrls: photoUrls.length,
+        allUrls: photoUrls.map((url, i) => `${i}: ${url?.substring(0, 50)}...`),
         mode: mode
       })
 
@@ -661,10 +661,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         project_id: activeProject.id,
       }
       
-      console.log('📦 Item data constructed:', {
+      console.log('📦 Item data constructed for database:', {
         product_name: itemData.product_name,
         product_name_length: itemData.product_name?.toString().length || 0,
         product_name_type: typeof itemData.product_name,
+        photos_count: itemData.photos.length,
+        photos_urls: itemData.photos,
         all_fields: Object.keys(itemData),
         mode: mode,
         project_id: activeProject.id
@@ -699,8 +701,27 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         console.log('📊 Database update result:', {
           error: updateError,
           updatedData: updateData,
-          success: !updateError
+          success: !updateError,
+          photosUpdated: updateData?.[0]?.photos?.length || 0,
+          photosExpected: itemData.photos.length,
+          photosSaved: updateData?.[0]?.photos || [],
+          productNameSaved: updateData?.[0]?.product_name
         })
+        
+        // Verify critical fields were saved
+        if (!updateError && updateData?.[0]) {
+          const savedData = updateData[0]
+          console.log('✅ Database save verification:', {
+            product_name_saved: savedData.product_name === itemData.product_name,
+            photos_saved_count: savedData.photos?.length || 0,
+            photos_match: (savedData.photos?.length || 0) === itemData.photos.length,
+            all_photos_saved: savedData.photos || []
+          })
+          
+          if ((savedData.photos?.length || 0) !== itemData.photos.length) {
+            console.error("❌ CRITICAL: Photos not saved correctly to database!")
+          }
+        }
         
         error = updateError
       } else {
@@ -748,6 +769,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         setPhotos([])
         setUploadedPhotos([])
         setUploadingPhotos(new Map())
+        uploadedPhotosRef.current = []
       }
 
       // Show success message with mobile-specific handling
