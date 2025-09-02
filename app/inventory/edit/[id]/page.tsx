@@ -1,6 +1,6 @@
 "use client"
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import { useProject } from '@/contexts/ProjectContext'
 import { ProjectHeader } from '@/components/project-header'
@@ -34,14 +34,119 @@ export default function EditInventoryPage() {
   const [item, setItem] = useState<InventoryItem | null>(null)
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [isUploadInProgress, setIsUploadInProgress] = useState(false)
 
   const itemId = params.id as string
 
+  // UPLOAD GUARD: Prevent navigation during uploads
+  useEffect(() => {
+    const handleBeforeUnload = (event: BeforeUnloadEvent) => {
+      if (isUploadInProgress) {
+        console.log('🚨 UPLOAD GUARD: Preventing page unload during upload')
+        event.preventDefault()
+        event.returnValue = 'Photo upload is in progress. Are you sure you want to leave?'
+        return 'Photo upload is in progress. Are you sure you want to leave?'
+      }
+    }
+
+    const handlePopState = (event: PopStateEvent) => {
+      if (isUploadInProgress) {
+        console.log('🚨 UPLOAD GUARD: Preventing navigation during upload')
+        event.preventDefault()
+        // Push the current state back to prevent navigation
+        window.history.pushState(null, '', window.location.href)
+        alert('Photo upload is in progress. Please wait for it to complete.')
+      }
+    }
+
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    window.addEventListener('popstate', handlePopState)
+
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload)
+      window.removeEventListener('popstate', handlePopState)
+    }
+  }, [isUploadInProgress])
+
+  // UPLOAD GUARD: Monitor upload progress from child component
+  const handleUploadProgressChange = useCallback((inProgress: boolean) => {
+    console.log('🔄 UPLOAD GUARD: Upload progress changed', {
+      timestamp: new Date().toISOString(),
+      inProgress,
+      previousState: isUploadInProgress
+    })
+    setIsUploadInProgress(inProgress)
+  }, [isUploadInProgress])
+
+  // RELOAD DETECTION: Component mount/unmount logging
+  useEffect(() => {
+    const timestamp = new Date().toISOString()
+    console.log('🔄 RELOAD DETECTION: EditInventoryPage component mounted', {
+      timestamp,
+      itemId,
+      hasActiveProject: !!activeProject,
+      projectId: activeProject?.id,
+      projectLoading
+    })
+
+    return () => {
+      console.log('🔄 RELOAD DETECTION: EditInventoryPage component unmounting', {
+        timestamp: new Date().toISOString(),
+        itemId,
+        reason: 'Component cleanup'
+      })
+    }
+  }, []) // Empty dependency array - only runs on mount/unmount
+
+  // RELOAD DETECTION: Track activeProject changes
+  useEffect(() => {
+    console.log('🔄 RELOAD DETECTION: activeProject changed', {
+      timestamp: new Date().toISOString(),
+      activeProject: activeProject ? {
+        id: activeProject.id,
+        name: activeProject.name
+      } : null,
+      projectLoading,
+      itemId
+    })
+  }, [activeProject, projectLoading])
+
+  // RELOAD DETECTION: Track item loading state changes
+  useEffect(() => {
+    console.log('🔄 RELOAD DETECTION: Item loading state changed', {
+      timestamp: new Date().toISOString(),
+      isLoading,
+      hasItem: !!item,
+      itemId,
+      itemPhotoCount: item?.photos?.length || 0
+    })
+  }, [isLoading, item])
+
   useEffect(() => {
     const loadItem = async () => {
-      if (!itemId || !activeProject) return
+      console.log('🔄 RELOAD DETECTION: loadItem called', {
+        timestamp: new Date().toISOString(),
+        itemId,
+        activeProjectId: activeProject?.id,
+        hasActiveProject: !!activeProject,
+        reason: 'useEffect dependency change'
+      })
+
+      if (!itemId || !activeProject) {
+        console.log('🔄 RELOAD DETECTION: loadItem skipped - missing dependencies', {
+          hasItemId: !!itemId,
+          hasActiveProject: !!activeProject
+        })
+        return
+      }
 
       try {
+        console.log('🔄 RELOAD DETECTION: Starting item load from database', {
+          timestamp: new Date().toISOString(),
+          itemId,
+          projectId: activeProject.id
+        })
+        
         setIsLoading(true)
         const supabase = createClient()
         
@@ -53,27 +158,43 @@ export default function EditInventoryPage() {
           .single()
 
         if (error) {
-          console.error('Error loading item:', error)
+          console.error('🔄 RELOAD DETECTION: Database load error:', error)
           setError('Error loading item')
           return
         }
 
         if (!data) {
+          console.log('🔄 RELOAD DETECTION: Item not found in database')
           setError('Item not found')
           return
         }
 
+        console.log('🔄 RELOAD DETECTION: Item loaded successfully from database', {
+          timestamp: new Date().toISOString(),
+          itemId: data.id,
+          productName: data.product_name,
+          photosInDatabase: data.photos?.length || 0,
+          allPhotos: data.photos || []
+        })
+
         setItem(data)
       } catch (error) {
-        console.error('Error loading item:', error)
+        console.error('🔄 RELOAD DETECTION: Exception during item load:', error)
         setError('Error loading item')
       } finally {
+        console.log('🔄 RELOAD DETECTION: Item loading completed', {
+          timestamp: new Date().toISOString(),
+          success: !error
+        })
         setIsLoading(false)
       }
     }
 
     if (activeProject) {
+      console.log('🔄 RELOAD DETECTION: activeProject exists, calling loadItem')
       loadItem()
+    } else {
+      console.log('🔄 RELOAD DETECTION: No activeProject, skipping loadItem')
     }
   }, [itemId, activeProject])
 
@@ -184,6 +305,7 @@ export default function EditInventoryPage() {
               mode="edit" 
               initialData={item}
               onSuccess={() => router.push('/inventory')}
+              onUploadProgressChange={handleUploadProgressChange}
             />
           </CardContent>
         </Card>

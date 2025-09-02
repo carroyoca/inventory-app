@@ -11,6 +11,8 @@ interface ProjectContextType {
   refreshActiveProject: () => Promise<void>
   clearProjectState: () => void
   switchToProject: (projectId: string) => Promise<void>
+  isUploadInProgress: boolean
+  setUploadInProgress: (inProgress: boolean) => void
 }
 
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
@@ -18,18 +20,48 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined)
 export function ProjectProvider({ children }: { children: ReactNode }) {
   const [activeProject, setActiveProject] = useState<Project | null>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isUploadInProgress, setUploadInProgress] = useState(false)
+
+  // RELOAD DETECTION: Monitor activeProject state changes
+  useEffect(() => {
+    console.log('🔄 PROJECT CONTEXT: activeProject state changed', {
+      timestamp: new Date().toISOString(),
+      hasActiveProject: !!activeProject,
+      projectId: activeProject?.id,
+      projectName: activeProject?.name,
+      isLoading,
+      isUploadInProgress
+    })
+  }, [activeProject, isLoading, isUploadInProgress])
 
   // Función para obtener el proyecto activo del usuario
   const getActiveProject = async () => {
+    console.log('🔄 PROJECT CONTEXT: getActiveProject called', {
+      timestamp: new Date().toISOString(),
+      currentProject: activeProject?.id,
+      isUploadInProgress
+    })
+
+    // UPLOAD GUARD: Don't reload project during uploads
+    if (isUploadInProgress) {
+      console.log('🚨 UPLOAD GUARD: Preventing project reload during upload')
+      return
+    }
+    
     try {
       const supabase = createClient()
       const { data: { session } } = await supabase.auth.getSession()
       
       if (!session?.user) {
+        console.log('🔄 PROJECT CONTEXT: No user session found')
         setIsLoading(false)
         setActiveProject(null)
         return
       }
+
+      console.log('🔄 PROJECT CONTEXT: User session found, loading projects', {
+        userId: session.user.id
+      })
 
       // Obtener el primer proyecto del usuario
       const { data: projects, error } = await supabase
@@ -92,8 +124,17 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           }],
           member_count: memberCount || 1
         } as any
+        
+        console.log('🔄 PROJECT CONTEXT: Setting active project', {
+          timestamp: new Date().toISOString(),
+          projectId: project.id,
+          projectName: project.name,
+          memberCount: project.member_count
+        })
+        
         setActiveProject(project)
       } else {
+        console.log('🔄 PROJECT CONTEXT: No projects found for user')
         setActiveProject(null)
       }
     } catch (error) {
@@ -112,6 +153,18 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   // Función para cambiar a un proyecto específico
   const switchToProject = async (projectId: string) => {
+    console.log('🔄 PROJECT CONTEXT: switchToProject called', {
+      timestamp: new Date().toISOString(),
+      requestedProjectId: projectId,
+      currentProjectId: activeProject?.id
+    })
+    
+    // Skip if we're already on the requested project
+    if (activeProject?.id === projectId) {
+      console.log('🔄 PROJECT CONTEXT: Already on requested project, skipping switch')
+      return
+    }
+    
     try {
       setIsLoading(true)
       const supabase = createClient()
@@ -205,8 +258,14 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
 
   // Función para limpiar el estado (útil para logout)
   const clearProjectState = () => {
+    console.log('🔄 PROJECT CONTEXT: clearProjectState called', {
+      timestamp: new Date().toISOString(),
+      isUploadInProgress
+    })
+
     setActiveProject(null)
     setIsLoading(false)
+    setUploadInProgress(false) // Clear upload state on logout
   }
 
   // Cargar proyecto activo y escuchar cambios de autenticación
@@ -220,11 +279,33 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     const supabase = createClient()
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
       (event, session) => {
+        console.log('🔄 AUTH STATE CHANGE: Authentication event detected', {
+          timestamp: new Date().toISOString(),
+          event,
+          hasSession: !!session,
+          userId: session?.user?.id,
+          previousProject: activeProject?.id
+        })
+
         if (event === 'SIGNED_OUT') {
+          console.log('🔄 AUTH STATE CHANGE: User signed out, clearing project')
           setActiveProject(null)
           setIsLoading(false)
         } else if (event === 'SIGNED_IN' && session?.user) {
+          console.log('🔄 AUTH STATE CHANGE: User signed in, loading project')
           getActiveProject()
+        } else if (event === 'TOKEN_REFRESHED') {
+          console.log('🔄 AUTH STATE CHANGE: Token refreshed - checking if project reload needed')
+          // CRITICAL FIX: Don't reload project during token refresh if we already have an active project
+          // This prevents unnecessary reloads that can interrupt uploads
+          if (!activeProject && session?.user) {
+            console.log('🔄 AUTH STATE CHANGE: No active project during token refresh, loading project')
+            getActiveProject()
+          } else {
+            console.log('🔄 AUTH STATE CHANGE: Token refreshed - keeping existing project to avoid interrupting uploads')
+          }
+        } else {
+          console.log('🔄 AUTH STATE CHANGE: Other auth event', { event })
         }
       }
     )
@@ -241,7 +322,9 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
     isLoading,
     refreshActiveProject,
     clearProjectState,
-    switchToProject
+    switchToProject,
+    isUploadInProgress,
+    setUploadInProgress
   }
 
   return (

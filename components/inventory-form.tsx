@@ -58,9 +58,10 @@ interface InventoryFormProps {
   mode?: 'create' | 'edit'
   initialData?: InventoryItem
   onSuccess?: () => void
+  onUploadProgressChange?: (inProgress: boolean) => void
 }
 
-export function InventoryForm({ mode = 'create', initialData, onSuccess }: InventoryFormProps) {
+export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploadProgressChange }: InventoryFormProps) {
   const { toast } = useToast()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [photos, setPhotos] = useState<File[]>([])
@@ -76,7 +77,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const cameraInputRef = useRef<HTMLInputElement>(null)
   // Use ref to track photos immediately without state closure issues
   const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
-  const { activeProject } = useProject()
+  const { activeProject, setUploadInProgress } = useProject()
   
   // Add render tracking to debug state loss
   console.log('🔄 InventoryForm render:', {
@@ -86,6 +87,28 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     timestamp: new Date().toISOString().split('T')[1]
   })
   
+  // RELOAD DETECTION: Component mount/unmount logging for InventoryForm
+  useEffect(() => {
+    const timestamp = new Date().toISOString()
+    console.log('🔄 INVENTORY FORM: Component mounted', {
+      timestamp,
+      mode,
+      hasInitialData: !!initialData,
+      initialDataPhotoCount: initialData?.photos?.length || 0,
+      activeProjectId: activeProject?.id
+    })
+
+    return () => {
+      console.log('🔄 INVENTORY FORM: Component unmounting', {
+        timestamp: new Date().toISOString(),
+        mode,
+        uploadedPhotosCount: uploadedPhotos.length,
+        refPhotosCount: uploadedPhotosRef.current.length,
+        reason: 'Component cleanup'
+      })
+    }
+  }, []) // Empty dependency array - only runs on mount/unmount
+
   // Monitor photo state changes to debug state loss
   useEffect(() => {
     console.log('📊 Photo state change detected:', {
@@ -95,6 +118,17 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       timestamp: new Date().toISOString().split('T')[1]
     })
   }, [uploadedPhotos.length])
+
+  // RELOAD DETECTION: Track activeProject changes in form
+  useEffect(() => {
+    console.log('🔄 INVENTORY FORM: activeProject changed', {
+      timestamp: new Date().toISOString(),
+      hasActiveProject: !!activeProject,
+      projectId: activeProject?.id,
+      mode,
+      uploadedPhotosWillBeLost: uploadedPhotos.length > 0
+    })
+  }, [activeProject])
   
   // CRITICAL FIX: Ensure ref state survives re-renders
   useEffect(() => {
@@ -288,6 +322,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     // Add new photos to the list (don't replace existing ones)
     setPhotos((prev) => [...prev, ...fileArray])
     
+    // UPLOAD GUARD: Notify parent about upload start
+    if (onUploadProgressChange) {
+      console.log('🚨 UPLOAD GUARD: Notifying parent - upload starting')
+      onUploadProgressChange(true)
+    }
+    
+    // GLOBAL UPLOAD GUARD: Set global upload state
+    console.log('🚨 GLOBAL UPLOAD GUARD: Setting global upload state to true')
+    setUploadInProgress(true)
+    
     // Create file keys for tracking
     const fileKeys: string[] = []
     
@@ -375,9 +419,29 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       // All uploads complete
       setIsUploadingAny(false)
       
+      // UPLOAD GUARD: Notify parent about upload completion
+      if (onUploadProgressChange) {
+        console.log('🚨 UPLOAD GUARD: Notifying parent - upload completed successfully')
+        onUploadProgressChange(false)
+      }
+      
+      // GLOBAL UPLOAD GUARD: Clear global upload state
+      console.log('🚨 GLOBAL UPLOAD GUARD: Setting global upload state to false (success)')
+      setUploadInProgress(false)
+      
     } catch (error) {
       console.error("❌ Upload batch failed:", error)
       setIsUploadingAny(false)
+      
+      // UPLOAD GUARD: Notify parent about upload failure
+      if (onUploadProgressChange) {
+        console.log('🚨 UPLOAD GUARD: Notifying parent - upload failed')
+        onUploadProgressChange(false)
+      }
+      
+      // GLOBAL UPLOAD GUARD: Clear global upload state
+      console.log('🚨 GLOBAL UPLOAD GUARD: Setting global upload state to false (error)')
+      setUploadInProgress(false)
       
       // Enhanced error handling for camera uploads
       if (lastUploadSource === 'camera' && hasAndroidChromeBug) {
