@@ -26,6 +26,9 @@ import { ProjectCategoriesManager } from "@/components/project-categories-manage
 import { ProjectAnalytics } from "@/components/project-analytics"
 import { ProjectSettings } from "@/components/project-settings"
 import { createClient } from "@/lib/supabase/client"
+import { WeeklyGoal } from "@/components/engagement/WeeklyGoal"
+import { TrophyShelf } from "@/components/engagement/TrophyShelf"
+import { StreakCounter } from "@/components/engagement/StreakCounter"
 
 interface InventoryStats {
   totalItems: number
@@ -187,6 +190,13 @@ export default function DashboardPage() {
               </div>
             </CardContent>
           </Card>
+        </div>
+
+        {/* Engagement: Streak + Weekly Goal + Trophies */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-12">
+          <StreakCounter />
+          <WeeklyGoal />
+          <TrophyShelf />
         </div>
 
         {/* Quick Actions */}

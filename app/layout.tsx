@@ -3,6 +3,7 @@ import { GeistSans } from 'geist/font/sans'
 import { GeistMono } from 'geist/font/mono'
 import './globals.css'
 import { ProjectProvider } from '@/contexts/ProjectContext'
+import { AchievementsProvider } from '@/contexts/AchievementsContext'
 import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 
@@ -36,8 +37,10 @@ html {
           disableTransitionOnChange
         >
           <ProjectProvider>
-            {children}
-            <Toaster />
+            <AchievementsProvider>
+              {children}
+              <Toaster />
+            </AchievementsProvider>
           </ProjectProvider>
         </ThemeProvider>
       </body>

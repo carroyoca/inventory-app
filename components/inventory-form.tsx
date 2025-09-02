@@ -16,6 +16,7 @@ import { useRouter } from "next/navigation"
 import Image from "next/image"
 import { useProject } from "@/contexts/ProjectContext"
 import { useToast } from "@/hooks/use-toast"
+import { useAchievements } from "@/contexts/AchievementsContext"
 
 interface ProjectCategory {
   id: string
@@ -78,6 +79,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
   // Use ref to track photos immediately without state closure issues
   const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
   const { activeProject, setUploadInProgress } = useProject()
+  const { recordItemAdded, recordPhotoAdded } = useAchievements()
   
   // Add render tracking to debug state loss
   console.log('🔄 InventoryForm render:', {
@@ -453,6 +455,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
       // GLOBAL UPLOAD GUARD: Clear global upload state
       console.log('🚨 GLOBAL UPLOAD GUARD: Setting global upload state to false (success)')
       setUploadInProgress(false)
+      try { await recordPhotoAdded(fileArray.length) } catch {}
       
     } catch (error) {
       console.error("❌ Upload batch failed:", error)
@@ -1070,6 +1073,9 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         })
       }
       
+      // Trigger achievements for item add/update
+      try { await recordItemAdded() } catch {}
+
       // Call onSuccess callback or redirect
       if (onSuccess) {
         onSuccess()
