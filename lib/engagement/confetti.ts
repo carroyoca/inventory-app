@@ -22,6 +22,7 @@ export function launchConfetti(durationMs = 1200) {
     document.body.removeChild(canvas)
     return
   }
+  const context = ctx as CanvasRenderingContext2D
 
   let w = (canvas.width = window.innerWidth)
   let h = (canvas.height = window.innerHeight)
@@ -53,14 +54,14 @@ export function launchConfetti(durationMs = 1200) {
 
   function draw() {
     const t = performance.now()
-    ctx.clearRect(0, 0, w, h)
+    context.clearRect(0, 0, w, h)
 
     particles.forEach((p) => {
       p.life += 16
       p.x += Math.cos(p.angle) * p.velocity
       p.y += Math.sin(p.angle) * p.velocity + p.life * 0.0008 // slight gravity
-      ctx.fillStyle = p.color
-      ctx.fillRect(p.x, p.y, p.size, p.size)
+      context.fillStyle = p.color
+      context.fillRect(p.x, p.y, p.size, p.size)
     })
 
     if (t < end) {
@@ -73,4 +74,3 @@ export function launchConfetti(durationMs = 1200) {
 
   requestAnimationFrame(draw)
 }
-
