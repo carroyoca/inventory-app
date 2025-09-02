@@ -77,12 +77,49 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   // Use ref to track photos immediately without state closure issues
   const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
   const { activeProject } = useProject()
+  
+  // Add render tracking to debug state loss
+  console.log('🔄 InventoryForm render:', {
+    mode,
+    uploadedPhotosCount: uploadedPhotos.length,
+    refPhotosCount: uploadedPhotosRef.current.length,
+    timestamp: new Date().toISOString().split('T')[1]
+  })
+  
+  // Monitor photo state changes to debug state loss
+  useEffect(() => {
+    console.log('📊 Photo state change detected:', {
+      statePhotos: uploadedPhotos.length,
+      refPhotos: uploadedPhotosRef.current.length,
+      stateMatchesRef: uploadedPhotos.length === uploadedPhotosRef.current.length,
+      timestamp: new Date().toISOString().split('T')[1]
+    })
+  }, [uploadedPhotos.length])
+  
+  // CRITICAL FIX: Ensure ref state survives re-renders
+  useEffect(() => {
+    // If ref has more photos than state, restore state from ref
+    if (uploadedPhotosRef.current.length > uploadedPhotos.length) {
+      console.log('🔄 CRITICAL: Ref has more photos than state, restoring from ref:', {
+        refCount: uploadedPhotosRef.current.length,
+        stateCount: uploadedPhotos.length,
+        restoring: true
+      })
+      setUploadedPhotos([...uploadedPhotosRef.current])
+    }
+  }, [uploadedPhotos.length, uploadedPhotosRef.current.length])
 
   // Load project categories
   useEffect(() => {
     const loadCategories = async () => {
       console.log('📂 Loading categories for project:', activeProject?.id)
       if (!activeProject) return
+      
+      // CRITICAL FIX: Prevent duplicate category loading that causes photo state loss
+      if (inventoryTypes.length > 0 && houseZones.length > 0 && !loadingCategories) {
+        console.log('📂 Categories already loaded, skipping reload to preserve photo state')
+        return
+      }
       
       try {
         const supabase = createClient()
@@ -143,6 +180,17 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   // Initialize form with existing data in edit mode (only once)
   useEffect(() => {
     if (mode === 'edit' && initialData && uploadedPhotos.length === 0) {
+      // CRITICAL FIX: Check if ref already has photos to prevent state loss
+      if (uploadedPhotosRef.current.length > 0) {
+        console.log("🔧 Ref already has photos, restoring from ref to prevent state loss:", {
+          refCount: uploadedPhotosRef.current.length,
+          stateCount: uploadedPhotos.length
+        })
+        // Restore state from ref
+        setUploadedPhotos(uploadedPhotosRef.current)
+        return
+      }
+      
       // Convert existing photo URLs to UploadedPhoto format
       const existingPhotos: UploadedPhoto[] = initialData.photos.map((url, index) => ({
         url,
