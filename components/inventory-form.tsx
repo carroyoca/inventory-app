@@ -72,7 +72,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const [loadingCategories, setLoadingCategories] = useState(true)
   const [lastUploadSource, setLastUploadSource] = useState<'camera' | 'gallery' | null>(null)
   const router = useRouter()
-  const fileInputRef = useRef<HTMLInputElement>(null)
+  const galleryInputRef = useRef<HTMLInputElement>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
   // Use ref to track photos immediately without state closure issues
   const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
   const { activeProject } = useProject()
@@ -163,12 +164,30 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
   const handlePhotoUpload = async (files: FileList) => {
     console.log("📸 Photo upload started with", files.length, "files")
     
-    // Detect device type for better handling
+    // Enhanced device and browser detection for targeted fixes
     const isAndroid = /Android/.test(navigator.userAgent)
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent)
     const isMobile = isAndroid || isIOS
+    const isChrome = /Chrome/.test(navigator.userAgent)
+    const isEdge = /Edg/.test(navigator.userAgent)
     
-    console.log("📱 Device detection:", { isAndroid, isIOS, isMobile, mode, hasInitialData: !!initialData })
+    // Detect Android version for Chrome bug workaround
+    const androidVersionMatch = navigator.userAgent.match(/Android (\d+)/)
+    const androidVersion = androidVersionMatch ? parseInt(androidVersionMatch[1]) : 0
+    const hasAndroidChromeBug = isAndroid && (isChrome || isEdge) && androidVersion >= 14
+    
+    console.log("📱 Enhanced device detection:", { 
+      isAndroid, 
+      isIOS, 
+      isMobile, 
+      isChrome, 
+      isEdge, 
+      androidVersion, 
+      hasAndroidChromeBug,
+      uploadSource: lastUploadSource,
+      mode, 
+      hasInitialData: !!initialData 
+    })
     
     // CRITICAL DEBUG: Check if we're in edit mode with existing photos
     if (mode === 'edit' && initialData) {
@@ -183,6 +202,41 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     // Convert FileList to Array for better mobile handling
     const fileArray = Array.from(files)
     
+    // Enhanced file validation for camera uploads
+    if (lastUploadSource === 'camera') {
+      console.log("📷 Camera file validation:", fileArray.map((file, i) => ({
+        index: i,
+        name: file.name || 'unnamed',
+        size: file.size,
+        type: file.type,
+        lastModified: file.lastModified,
+        hasValidName: !!(file.name && file.name.length > 0),
+        hasValidType: file.type.startsWith('image/'),
+        hasValidSize: file.size > 0,
+        androidChromeBugDetected: hasAndroidChromeBug
+      })))
+      
+      // Check for common camera file issues
+      const invalidFiles = fileArray.filter(file => 
+        !file.type.startsWith('image/') || 
+        file.size === 0 ||
+        (!file.name && hasAndroidChromeBug)
+      )
+      
+      if (invalidFiles.length > 0) {
+        console.error("❌ Invalid camera files detected:", invalidFiles)
+        toast({
+          title: hasAndroidChromeBug ? "Camera Issue Detected" : "Invalid Files",
+          description: hasAndroidChromeBug 
+            ? "Camera capture may not work properly on this device. Please try using Gallery instead."
+            : "Some files are invalid. Please try again.",
+          variant: "destructive"
+        })
+        setIsUploadingAny(false)
+        return
+      }
+    }
+    
     // Add new photos to the list (don't replace existing ones)
     setPhotos((prev) => [...prev, ...fileArray])
     
@@ -193,15 +247,23 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
     setUploadingPhotos((prev) => {
       const newMap = new Map(prev)
       fileArray.forEach((file, index) => {
-        const fileKey = `${file.name}-${file.size}-${Date.now()}-${index}`
+        // FIXED: Generate reliable file keys even for camera files with empty names
+        const safeName = file.name || `camera-${lastUploadSource || 'unknown'}-file`
+        const timestamp = Date.now()
+        const random = Math.random().toString(36).substring(2, 8)
+        const fileKey = `${safeName}-${file.size}-${timestamp}-${random}-${index}`
+        
         fileKeys.push(fileKey)
         newMap.set(fileKey, true)
+        
+        console.log(`📋 Generated file key for ${lastUploadSource}: ${fileKey}`)
       })
       console.log("📊 Upload states updated:", {
         previousStates: prev.size,
         newFiles: fileArray.length,
         totalStates: newMap.size,
         mode: mode,
+        uploadSource: lastUploadSource,
         fileKeys: fileKeys
       })
       return newMap
@@ -258,17 +320,37 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
       const completedUploads = await Promise.all(uploadPromises)
       console.log("🎉 All uploads completed successfully:", completedUploads)
       
+      // Clear input values to prevent resubmission issues
+      if (galleryInputRef.current) galleryInputRef.current.value = ''
+      if (cameraInputRef.current) cameraInputRef.current.value = ''
+      
       // All uploads complete
       setIsUploadingAny(false)
       
     } catch (error) {
       console.error("❌ Upload batch failed:", error)
       setIsUploadingAny(false)
-      toast({
-        title: "Upload Failed",
-        description: "One or more photo uploads failed. Please try again.",
-        variant: "destructive"
-      })
+      
+      // Enhanced error handling for camera uploads
+      if (lastUploadSource === 'camera' && hasAndroidChromeBug) {
+        toast({
+          title: "Camera Upload Failed", 
+          description: "Camera capture isn't working properly on this device. Please try using Gallery instead.",
+          variant: "destructive"
+        })
+      } else if (lastUploadSource === 'camera') {
+        toast({
+          title: "Camera Upload Failed",
+          description: "Camera photo upload failed. You can try again or use Gallery instead.",
+          variant: "destructive"
+        })
+      } else {
+        toast({
+          title: "Upload Failed",
+          description: "One or more photo uploads failed. Please try again.",
+          variant: "destructive"
+        })
+      }
     }
   }
 
@@ -977,16 +1059,44 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
         <Label className="text-sm font-medium">Photos</Label>
         <div className="space-y-4">
           <div className="flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-4">
-            {/* Hidden Photo Upload Input */}
+            {/* Hidden Photo Upload Inputs - Separate for Camera/Gallery */}
             <div className="hidden">
+              {/* Gallery Input */}
               <Input
-                ref={fileInputRef}
-                id="photos"
+                ref={galleryInputRef}
+                id="photos-gallery"
                 type="file"
                 multiple
                 accept="image/*"
                 onChange={(e) => {
                   if (e.target.files) {
+                    setLastUploadSource('gallery')
+                    handlePhotoUpload(e.target.files)
+                  }
+                }}
+                className="h-11 sm:h-10"
+                disabled={isSubmitting}
+              />
+              
+              {/* Camera Input with Android Chrome workaround */}
+              <Input
+                ref={cameraInputRef}
+                id="photos-camera"
+                type="file"
+                accept="image/*,android/force-camera-workaround"
+                capture="environment"
+                onChange={(e) => {
+                  if (e.target.files) {
+                    setLastUploadSource('camera')
+                    console.log("📷 Camera input triggered:", {
+                      filesCount: e.target.files.length,
+                      firstFile: e.target.files[0] ? {
+                        name: e.target.files[0].name,
+                        size: e.target.files[0].size,
+                        type: e.target.files[0].type,
+                        lastModified: e.target.files[0].lastModified
+                      } : null
+                    })
                     handlePhotoUpload(e.target.files)
                   }
                 }}
@@ -1000,14 +1110,13 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
               type="button"
               variant="outline"
               onClick={() => {
-                if (fileInputRef.current) {
-                  setLastUploadSource('gallery') // Default to gallery for main button
-                  fileInputRef.current.click()
+                if (galleryInputRef.current) {
+                  galleryInputRef.current.click()
                 } else {
-                  console.error("File input ref not found")
+                  console.error("Gallery input ref not found")
                   toast({
                     title: "Error",
-                    description: "File input not found. Please refresh the page.",
+                    description: "Gallery input not found. Please refresh the page.",
                     variant: "destructive"
                   })
                 }
@@ -1035,10 +1144,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (fileInputRef.current) {
-                    setLastUploadSource('gallery')
-                    fileInputRef.current.removeAttribute("capture")
-                    fileInputRef.current.click()
+                  if (galleryInputRef.current) {
+                    console.log("📁 Gallery button clicked")
+                    galleryInputRef.current.click()
+                  } else {
+                    console.error("Gallery input ref not found")
+                    toast({
+                      title: "Error",
+                      description: "Gallery input not available. Please refresh the page.",
+                      variant: "destructive"
+                    })
                   }
                 }}
                 className="flex-1"
@@ -1049,10 +1164,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess }: Inven
                 type="button"
                 variant="outline"
                 onClick={() => {
-                  if (fileInputRef.current) {
-                    setLastUploadSource('camera')
-                    fileInputRef.current.setAttribute("capture", "environment")
-                    fileInputRef.current.click()
+                  if (cameraInputRef.current) {
+                    console.log("📷 Camera button clicked - triggering camera input")
+                    cameraInputRef.current.click()
+                  } else {
+                    console.error("Camera input ref not found")
+                    toast({
+                      title: "Camera Unavailable", 
+                      description: "Camera input not available. Please use Gallery option.",
+                      variant: "destructive"
+                    })
                   }
                 }}
                 className="flex-1"
