@@ -203,11 +203,6 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const recordItemAdded = useCallback(async () => {
     bumpStreakAndWeekly()
     const stats = await fetchStats()
-    const weeklyComplete = (prev => prev.weeklyProgress >= prev.weeklyGoal)
-    setState((prev) => {
-      const wc = (prev.weekStartISO === getWeekStart(new Date()).toISOString()) && (prev.weeklyProgress >= prev.weeklyGoal)
-      return { ...prev, recentlyUnlocked: prev.recentlyUnlocked, weeklyProgress: prev.weeklyProgress }
-    })
     checkUnlocks({ totalItems: stats.totalItems, weeklyComplete: false })
   }, [bumpStreakAndWeekly, fetchStats, checkUnlocks])
 
@@ -243,4 +238,3 @@ export function useAchievements() {
   if (!ctx) throw new Error('useAchievements must be used within AchievementsProvider')
   return ctx
 }
-
