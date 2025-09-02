@@ -43,7 +43,7 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
   const router = useRouter()
 
   const handleDelete = async (id: string) => {
-    if (!confirm("Are you sure you want to delete this item?")) return
+    if (!confirm("¿Seguro que deseas eliminar este ítem?")) return
 
     try {
       console.log("=== DELETE OPERATION START ===")
@@ -112,8 +112,8 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
       console.error("Error message:", error instanceof Error ? error.message : "Unknown error")
       console.error("Error stack:", error instanceof Error ? error.stack : "No stack")
       toast({
-        title: "Delete Error",
-        description: `Error deleting item: ${error instanceof Error ? error.message : "Unknown error"}`,
+        title: "Error al eliminar",
+        description: `Error eliminando ítem: ${error instanceof Error ? error.message : "Error desconocido"}`,
         variant: "destructive"
       })
     }
@@ -122,6 +122,16 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
   const handleEdit = (item: InventoryItem) => {
     // Navigate to the dedicated edit page
     router.push(`/inventory/edit/${item.id}`)
+  }
+
+  const statusLabel = (status: string) => {
+    switch (status) {
+      case 'available': return 'Disponible'
+      case 'sold': return 'Vendido'
+      case 'reserved': return 'Reservado'
+      case 'not_for_sale': return 'No a la venta'
+      default: return status.replace('_', ' ')
+    }
   }
 
   return (
@@ -134,12 +144,12 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
               <Image src={item.photos[0] || "/placeholder.svg"} alt={item.product_name} fill className="object-cover" />
             ) : (
               <div className="flex items-center justify-center h-full">
-                <span className="text-gray-400 text-sm">No photo</span>
+                <span className="text-gray-400 text-sm">Sin foto</span>
               </div>
             )}
             {item.photos && item.photos.length > 1 && (
               <div className="absolute top-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
-                +{item.photos.length - 1} more
+                +{item.photos.length - 1} más
               </div>
             )}
           </div>
@@ -153,7 +163,7 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
                   <p className="text-xs sm:text-sm text-gray-500">{item.product_type}</p>
                 </div>
                 <Badge className={statusColors[item.status as keyof typeof statusColors] || statusColors.available}>
-                  {item.status.replace("_", " ")}
+                  {statusLabel(item.status)}
                 </Badge>
               </div>
 
@@ -180,7 +190,7 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
                 </div>
                 {item.sale_price && (
                   <div className="text-green-600 font-medium text-xs sm:text-sm">
-                    Sale: ${item.sale_price.toLocaleString()}
+                    Venta: ${item.sale_price.toLocaleString()}
                   </div>
                 )}
               </div>
@@ -189,7 +199,7 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
               <div className="flex items-center gap-2 pt-2 border-t">
                 <Button variant="outline" size="sm" className="flex-1 h-9 text-xs sm:text-sm bg-transparent" onClick={() => handleEdit(item)}>
                   <Edit className="h-3 w-3 mr-1" />
-                  Edit
+                  Editar
                 </Button>
                 {item.listing_link && (
                   <Button asChild variant="outline" size="sm" className="h-9 px-2 bg-transparent">

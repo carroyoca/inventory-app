@@ -30,25 +30,25 @@ export function InventoryStats({ items }: InventoryStatsProps) {
 
   const stats = [
     {
-      title: "Total Items",
+      title: "Total de ítems",
       value: totalItems.toString(),
       icon: Package,
       color: "text-blue-600",
     },
     {
-      title: "Available",
+      title: "Disponibles",
       value: availableItems.toString(),
       icon: CheckCircle,
       color: "text-green-600",
     },
     {
-      title: "Sold",
+      title: "Vendidos",
       value: soldItems.toString(),
       icon: DollarSign,
       color: "text-purple-600",
     },
     {
-      title: "Reserved",
+      title: "Reservados",
       value: reservedItems.toString(),
       icon: Clock,
       color: "text-orange-600",
@@ -68,15 +68,15 @@ export function InventoryStats({ items }: InventoryStatsProps) {
                   <div className="text-3xl font-bold text-gray-900">{stat.value}</div>
                 </div>
                 <div className={`p-3 rounded-xl ${
-                  stat.title === "Total Items" ? "bg-blue-100" :
-                  stat.title === "Available" ? "bg-green-100" :
-                  stat.title === "Sold" ? "bg-purple-100" :
+                  stat.title === "Total de ítems" ? "bg-blue-100" :
+                  stat.title === "Disponibles" ? "bg-green-100" :
+                  stat.title === "Vendidos" ? "bg-purple-100" :
                   "bg-orange-100"
                 }`}>
                   <Icon className={`h-6 w-6 ${
-                    stat.title === "Total Items" ? "text-blue-600" :
-                    stat.title === "Available" ? "text-green-600" :
-                    stat.title === "Sold" ? "text-purple-600" :
+                    stat.title === "Total de ítems" ? "text-blue-600" :
+                    stat.title === "Disponibles" ? "text-green-600" :
+                    stat.title === "Vendidos" ? "text-purple-600" :
                     "text-orange-600"
                   }`} />
                 </div>

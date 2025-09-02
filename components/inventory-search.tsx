@@ -33,10 +33,10 @@ interface ProjectCategory {
 
 
 const STATUS_OPTIONS = [
-  { value: "available", label: "Available" },
-  { value: "sold", label: "Sold" },
-  { value: "reserved", label: "Reserved" },
-  { value: "not_for_sale", label: "Not for Sale" },
+  { value: "available", label: "Disponible" },
+  { value: "sold", label: "Vendido" },
+  { value: "reserved", label: "Reservado" },
+  { value: "not_for_sale", label: "No a la venta" },
 ]
 
 export function InventorySearch({ onFiltersChange, totalResults }: InventorySearchProps) {
@@ -125,12 +125,12 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
 
   return (
     <div className="space-y-4">
-      {/* Search Bar */}
+      {/* Barra de búsqueda */}
       <div className="flex gap-2">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <Input
-            placeholder="Search by name, description, or ID..."
+            placeholder="Buscar por nombre, descripción o ID..."
             value={filters.search}
             onChange={(e) => updateFilters({ search: e.target.value })}
             className="pl-10 h-11 sm:h-10"
@@ -138,7 +138,7 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
         </div>
         <Button variant="outline" onClick={() => setShowFilters(!showFilters)} className="h-11 sm:h-10 px-3">
           <SlidersHorizontal className="h-4 w-4 sm:mr-2" />
-          <span className="hidden sm:inline">Filters</span>
+          <span className="hidden sm:inline">Filtros</span>
           {activeFiltersCount > 0 && (
             <Badge variant="secondary" className="ml-2 h-5 w-5 p-0 text-xs">
               {activeFiltersCount}
@@ -147,39 +147,39 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
         </Button>
       </div>
 
-      {/* Results Count */}
+      {/* Conteo de resultados */}
       <div className="flex items-center justify-between text-sm text-gray-600">
         <span>
-          {totalResults} item{totalResults !== 1 ? "s" : ""} found
+          {totalResults} elemento{totalResults !== 1 ? "s" : ""} encontrado{totalResults !== 1 ? "s" : ""}
         </span>
         {activeFiltersCount > 0 && (
           <Button variant="ghost" size="sm" onClick={clearFilters} className="h-8 px-2">
             <X className="h-3 w-3 mr-1" />
-            Clear filters
+            Limpiar filtros
           </Button>
         )}
       </div>
 
-      {/* Filters Panel */}
+      {/* Panel de filtros */}
       {showFilters && (
         <Card>
           <CardHeader className="pb-4">
             <CardTitle className="text-lg flex items-center gap-2">
               <Filter className="h-4 w-4" />
-              Filters
+              Filtros
             </CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-              {/* Product Type Filter */}
+              {/* Filtro por tipo de producto */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Product Type</Label>
+                <Label className="text-sm font-medium">Tipo de producto</Label>
                 <Select value={filters.productType} onValueChange={(value) => updateFilters({ productType: value })}>
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="All types" />
+                    <SelectValue placeholder="Todos los tipos" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All types</SelectItem>
+                    <SelectItem value="all">Todos los tipos</SelectItem>
                     {inventoryTypes.map((type) => (
                       <SelectItem key={type.id} value={type.name}>
                         {type.name}
@@ -189,15 +189,15 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
                 </Select>
               </div>
 
-              {/* House Zone Filter */}
+              {/* Filtro por ubicación */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Location</Label>
+                <Label className="text-sm font-medium">Ubicación</Label>
                 <Select value={filters.houseZone} onValueChange={(value) => updateFilters({ houseZone: value })}>
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="All locations" />
+                    <SelectValue placeholder="Todas las ubicaciones" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All locations</SelectItem>
+                    <SelectItem value="all">Todas las ubicaciones</SelectItem>
                     {houseZones.map((zone) => (
                       <SelectItem key={zone.id} value={zone.name}>
                         {zone.name}
@@ -207,15 +207,15 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
                 </Select>
               </div>
 
-              {/* Status Filter */}
+              {/* Filtro por estado */}
               <div className="space-y-2">
-                <Label className="text-sm font-medium">Status</Label>
+                <Label className="text-sm font-medium">Estado</Label>
                 <Select value={filters.status} onValueChange={(value) => updateFilters({ status: value })}>
                   <SelectTrigger className="h-10">
-                    <SelectValue placeholder="All statuses" />
+                    <SelectValue placeholder="Todos los estados" />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="all">All statuses</SelectItem>
+                    <SelectItem value="all">Todos los estados</SelectItem>
                     {STATUS_OPTIONS.map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
@@ -226,20 +226,20 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
               </div>
             </div>
 
-            {/* Price Range */}
+            {/* Rango de precio ($) */}
             <div className="space-y-2">
-              <Label className="text-sm font-medium">Price Range ($)</Label>
+              <Label className="text-sm font-medium">Rango de precio ($)</Label>
               <div className="grid grid-cols-2 gap-2">
                 <Input
                   type="number"
-                  placeholder="Min price"
+                  placeholder="Precio mínimo"
                   value={filters.minPrice}
                   onChange={(e) => updateFilters({ minPrice: e.target.value })}
                   className="h-10"
                 />
                 <Input
                   type="number"
-                  placeholder="Max price"
+                  placeholder="Precio máximo"
                   value={filters.maxPrice}
                   onChange={(e) => updateFilters({ maxPrice: e.target.value })}
                   className="h-10"
@@ -253,31 +253,31 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
                 <div className="flex flex-wrap gap-2">
                   {filters.search && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      Search: "{filters.search}"
+                      Búsqueda: "{filters.search}"
                       <X className="h-3 w-3 cursor-pointer" onClick={() => updateFilters({ search: "" })} />
                     </Badge>
                   )}
                   {filters.productType !== "all" && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      Type: {filters.productType}
+                      Tipo: {filters.productType}
                       <X className="h-3 w-3 cursor-pointer" onClick={() => updateFilters({ productType: "all" })} />
                     </Badge>
                   )}
                   {filters.houseZone !== "all" && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      Location: {filters.houseZone}
+                      Ubicación: {filters.houseZone}
                       <X className="h-3 w-3 cursor-pointer" onClick={() => updateFilters({ houseZone: "all" })} />
                     </Badge>
                   )}
                   {filters.status !== "all" && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      Status: {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
+                      Estado: {STATUS_OPTIONS.find((s) => s.value === filters.status)?.label}
                       <X className="h-3 w-3 cursor-pointer" onClick={() => updateFilters({ status: "all" })} />
                     </Badge>
                   )}
                   {(filters.minPrice || filters.maxPrice) && (
                     <Badge variant="secondary" className="flex items-center gap-1">
-                      Price: ${filters.minPrice || "0"} - ${filters.maxPrice || "∞"}
+                      Precio: ${filters.minPrice || "0"} - ${filters.maxPrice || "∞"}
                       <X
                         className="h-3 w-3 cursor-pointer"
                         onClick={() => updateFilters({ minPrice: "", maxPrice: "" })}

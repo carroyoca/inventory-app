@@ -43,7 +43,7 @@ export function WeeklyGoal() {
           </text>
         </svg>
         <div className="flex-1">
-          <div className="text-sm text-gray-600">Weekly Goal</div>
+          <div className="text-sm text-gray-600">Meta semanal</div>
           <div className="text-xl font-bold text-gray-900">{state.weeklyProgress} / {state.weeklyGoal}</div>
           <div className="mt-3 flex gap-2">
             {[5, 7, 10, 14].map(v => (
@@ -57,4 +57,3 @@ export function WeeklyGoal() {
     </Card>
   )
 }
-

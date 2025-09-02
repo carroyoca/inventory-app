@@ -14,6 +14,7 @@ import {
   BarChart3, 
   Users, 
   ArrowRight,
+  ArrowLeft,
   TrendingUp,
   DollarSign,
   Calendar,
@@ -123,7 +124,19 @@ export default function DashboardPage() {
       <ProjectHeader />
       
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-        {/* Welcome Section */}
+        {/* Botón volver al Dashboard */}
+        <div className="mb-4">
+          <Button 
+            variant="outline" 
+            onClick={() => { try { router.back() } catch { router.push('/dashboard') } }}
+            className="border-purple-200 text-purple-600 hover:bg-purple-50"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </Button>
+        </div>
+
+        {/* Sección de bienvenida */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
             Bienvenido a tu Dashboard
@@ -139,7 +152,7 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Total Items</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Total de ítems</p>
                   <div className="text-3xl font-bold text-gray-900">
                     {stats.isLoading ? (
                       <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>
@@ -159,7 +172,7 @@ export default function DashboardPage() {
             <CardContent className="p-6">
               <div className="flex items-center justify-between">
                 <div>
-                  <p className="text-sm font-medium text-gray-600 mb-1">Valor Total</p>
+                  <p className="text-sm font-medium text-gray-600 mb-1">Valor total</p>
                   <div className="text-3xl font-bold text-gray-900">
                     {stats.isLoading ? (
                       <div className="animate-pulse bg-gray-200 h-8 w-16 rounded"></div>

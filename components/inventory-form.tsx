@@ -25,10 +25,10 @@ interface ProjectCategory {
 }
 
 const STATUS_OPTIONS = [
-  { value: "available", label: "Available" },
-  { value: "sold", label: "Sold" },
-  { value: "reserved", label: "Reserved" },
-  { value: "not_for_sale", label: "Not for Sale" },
+  { value: "available", label: "Disponible" },
+  { value: "sold", label: "Vendido" },
+  { value: "reserved", label: "Reservado" },
+  { value: "not_for_sale", label: "No a la venta" },
 ]
 
 interface UploadedPhoto {

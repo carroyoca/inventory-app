@@ -37,6 +37,7 @@ interface AchievementsContextType {
   recordPhotoAdded: (count?: number) => Promise<void>
   setWeeklyGoal: (goal: number) => void
   clearRecentlyUnlocked: () => void
+  resetAchievements: () => void
 }
 
 const AchievementsContext = createContext<AchievementsContextType | undefined>(undefined)
@@ -146,14 +147,14 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
   const checkUnlocks = useCallback((stats: { totalItems?: number; totalPhotos?: number; weeklyComplete?: boolean }) => {
     const unlocks: RecentlyUnlocked[] = []
     const labels: Record<AchievementKey, string> = {
-      items_1: 'First Item!',
-      items_10: '10 Items Milestone',
-      items_25: '25 Items Milestone',
-      items_50: '50 Items Milestone',
-      photos_10: '10 Photos!',
-      photos_50: '50 Photos!',
-      photos_100: '100 Photos!',
-      week_goal_completed: 'Weekly Goal Completed',
+      items_1: '¡Primer ítem!',
+      items_10: 'Meta de 10 ítems',
+      items_25: 'Meta de 25 ítems',
+      items_50: 'Meta de 50 ítems',
+      photos_10: '¡10 fotos!',
+      photos_50: '¡50 fotos!',
+      photos_100: '¡100 fotos!',
+      week_goal_completed: 'Meta semanal completada',
     }
 
     setState((prev) => {
@@ -177,7 +178,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
         // use first; queue more later if needed
         const first = unlocks[0]
         // toast + confetti
-        toast({ title: '🎉 Achievement Unlocked', description: first.label })
+        toast({ title: '🎉 Logro desbloqueado', description: first.label })
         launchConfetti()
         return { ...prev, unlocked: next, recentlyUnlocked: first }
       }
@@ -215,7 +216,7 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
       return prev
     })
     // Mild celebration for first few photos
-    toast({ title: '📷 Photo Added', description: `${count} photo${count > 1 ? 's' : ''} uploaded` })
+    toast({ title: '📷 Foto añadida', description: `${count} foto${count > 1 ? 's' : ''} subida${count > 1 ? 's' : ''}` })
   }, [bumpStreakAndWeekly, toast])
 
   const setWeeklyGoal = useCallback((goal: number) => {
@@ -224,7 +225,23 @@ export function AchievementsProvider({ children }: { children: React.ReactNode }
 
   const clearRecentlyUnlocked = useCallback(() => setState((prev) => ({ ...prev, recentlyUnlocked: null })), [])
 
-  const value = useMemo<AchievementsContextType>(() => ({ state, recordItemAdded, recordPhotoAdded, setWeeklyGoal, clearRecentlyUnlocked }), [state, recordItemAdded, recordPhotoAdded, setWeeklyGoal, clearRecentlyUnlocked])
+  const resetAchievements = useCallback(() => {
+    const storageKey = keyFor(activeProject?.id, userId)
+    try { if (typeof window !== 'undefined') localStorage.removeItem(storageKey) } catch {}
+    const wkStart = getWeekStart(new Date()).toISOString()
+    setState({
+      unlocked: new Set<AchievementKey>(),
+      streak: 0,
+      lastActionDate: null,
+      weeklyGoal: 7,
+      weekStartISO: wkStart,
+      weeklyProgress: 0,
+      recentlyUnlocked: null,
+    })
+    toast({ title: '✅ Logros restablecidos', description: 'Se han restablecido los trofeos y metas de este proyecto.' })
+  }, [activeProject?.id, userId, toast])
+
+  const value = useMemo<AchievementsContextType>(() => ({ state, recordItemAdded, recordPhotoAdded, setWeeklyGoal, clearRecentlyUnlocked, resetAchievements }), [state, recordItemAdded, recordPhotoAdded, setWeeklyGoal, clearRecentlyUnlocked, resetAchievements])
 
   return (
     <AchievementsContext.Provider value={value}>

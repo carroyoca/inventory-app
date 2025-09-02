@@ -13,11 +13,10 @@ export function StreakCounter() {
           <Flame className="h-6 w-6 text-orange-600" />
         </div>
         <div>
-          <div className="text-sm text-gray-600">Streak</div>
-          <div className="text-xl font-bold text-gray-900">{state.streak} day{state.streak === 1 ? '' : 's'}</div>
+          <div className="text-sm text-gray-600">Racha</div>
+          <div className="text-xl font-bold text-gray-900">{state.streak} día{state.streak === 1 ? '' : 's'}</div>
         </div>
       </CardContent>
     </Card>
   )
 }
-
