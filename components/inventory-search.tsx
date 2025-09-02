@@ -114,7 +114,14 @@ export function InventorySearch({ onFiltersChange, totalResults }: InventorySear
     onFiltersChange(clearedFilters)
   }
 
-  const activeFiltersCount = Object.values(filters).filter((value) => value !== "").length
+  // Only count filters that are actually restricting results (exclude defaults like "all")
+  const activeFiltersCount = (
+    (filters.search ? 1 : 0) +
+    (filters.productType && filters.productType !== 'all' ? 1 : 0) +
+    (filters.houseZone && filters.houseZone !== 'all' ? 1 : 0) +
+    (filters.status && filters.status !== 'all' ? 1 : 0) +
+    (filters.minPrice || filters.maxPrice ? 1 : 0)
+  )
 
   return (
     <div className="space-y-4">

@@ -92,17 +92,17 @@ export default function InventoryPage() {
     }
 
     // Product type filter
-    if (filters.productType) {
+    if (filters.productType && filters.productType !== 'all') {
       filtered = filtered.filter((item) => item.product_type === filters.productType)
     }
 
     // House zone filter
-    if (filters.houseZone) {
+    if (filters.houseZone && filters.houseZone !== 'all') {
       filtered = filtered.filter((item) => item.house_zone === filters.houseZone)
     }
 
     // Status filter
-    if (filters.status) {
+    if (filters.status && filters.status !== 'all') {
       filtered = filtered.filter((item) => item.status === filters.status)
     }
 
