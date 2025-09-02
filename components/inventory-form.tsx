@@ -213,33 +213,53 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
 
   // Initialize form with existing data in edit mode (only once)
   useEffect(() => {
-    if (mode === 'edit' && initialData && uploadedPhotos.length === 0) {
-      // CRITICAL FIX: Check if ref already has photos to prevent state loss
-      if (uploadedPhotosRef.current.length > 0) {
-        console.log("🔧 Ref already has photos, restoring from ref to prevent state loss:", {
+    if (mode === 'edit' && initialData) {
+      console.log("🔧 ENHANCED INITIALIZATION: Component initializing in edit mode", {
+        hasInitialData: !!initialData,
+        initialDataPhotoCount: initialData.photos?.length || 0,
+        currentStatePhotoCount: uploadedPhotos.length,
+        refPhotoCount: uploadedPhotosRef.current.length,
+        timestamp: new Date().toISOString()
+      })
+
+      // CRITICAL FIX: Check if ref already has MORE photos than initialData (uploaded photos)
+      if (uploadedPhotosRef.current.length > (initialData.photos?.length || 0)) {
+        console.log("🚨 CRITICAL FIX: Ref has more photos than database - preserving uploaded photos!", {
           refCount: uploadedPhotosRef.current.length,
-          stateCount: uploadedPhotos.length
+          databaseCount: initialData.photos?.length || 0,
+          stateCount: uploadedPhotos.length,
+          preservingUploads: true
         })
-        // Restore state from ref
-        setUploadedPhotos(uploadedPhotosRef.current)
+        // Keep the uploaded photos from ref - don't overwrite with database data
+        if (uploadedPhotos.length !== uploadedPhotosRef.current.length) {
+          setUploadedPhotos([...uploadedPhotosRef.current])
+        }
         return
       }
-      
-      // Convert existing photo URLs to UploadedPhoto format
-      const existingPhotos: UploadedPhoto[] = initialData.photos.map((url, index) => ({
-        url,
-        filename: `existing-photo-${index}.jpg`,
-        size: 0,
-        type: 'image/jpeg'
-      }))
-      setUploadedPhotos(existingPhotos)
-      // CRITICAL: Also update the ref immediately
-      uploadedPhotosRef.current = existingPhotos
-      console.log("🔧 Initialized photos in edit mode:", {
-        count: existingPhotos.length,
-        refCount: uploadedPhotosRef.current.length,
-        mode: mode
-      })
+
+      // CRITICAL FIX: Only initialize from database if state is empty AND ref doesn't have uploads
+      if (uploadedPhotos.length === 0 && uploadedPhotosRef.current.length === 0) {
+        // Convert existing photo URLs to UploadedPhoto format
+        const existingPhotos: UploadedPhoto[] = initialData.photos.map((url, index) => ({
+          url,
+          filename: `existing-photo-${index}.jpg`,
+          size: 0,
+          type: 'image/jpeg'
+        }))
+        setUploadedPhotos(existingPhotos)
+        // CRITICAL: Also update the ref immediately
+        uploadedPhotosRef.current = existingPhotos
+        console.log("🔧 Initialized photos from database:", {
+          count: existingPhotos.length,
+          refCount: uploadedPhotosRef.current.length,
+          mode: mode
+        })
+      } else {
+        console.log("🔧 Skipping database initialization - photos already present", {
+          stateCount: uploadedPhotos.length,
+          refCount: uploadedPhotosRef.current.length
+        })
+      }
     }
   }, [mode, initialData, uploadedPhotos.length])
 

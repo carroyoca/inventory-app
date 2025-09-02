@@ -129,6 +129,8 @@ export default function EditInventoryPage() {
         itemId,
         activeProjectId: activeProject?.id,
         hasActiveProject: !!activeProject,
+        isUploadInProgress,
+        hasExistingItem: !!item,
         reason: 'useEffect dependency change'
       })
 
@@ -137,6 +139,20 @@ export default function EditInventoryPage() {
           hasItemId: !!itemId,
           hasActiveProject: !!activeProject
         })
+        return
+      }
+
+      // CRITICAL FIX: Don't reload item from database during upload - this prevents photo loss
+      if (isUploadInProgress) {
+        console.log('🚨 CRITICAL FIX: Preventing database item reload during upload')
+        console.log('📱 Upload in progress - maintaining current item state to preserve uploaded photos')
+        return
+      }
+
+      // CRITICAL FIX: Don't reload item if we already have the same item loaded
+      // This prevents unnecessary database calls during auth events
+      if (item && item.id === itemId) {
+        console.log('🔄 RELOAD DETECTION: Item already loaded, skipping database reload to prevent disruption')
         return
       }
 
@@ -196,7 +212,7 @@ export default function EditInventoryPage() {
     } else {
       console.log('🔄 RELOAD DETECTION: No activeProject, skipping loadItem')
     }
-  }, [itemId, activeProject])
+  }, [itemId, activeProject, isUploadInProgress, item])
 
   if (projectLoading) {
     return (

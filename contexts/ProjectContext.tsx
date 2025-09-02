@@ -292,8 +292,19 @@ export function ProjectProvider({ children }: { children: ReactNode }) {
           setActiveProject(null)
           setIsLoading(false)
         } else if (event === 'SIGNED_IN' && session?.user) {
-          console.log('🔄 AUTH STATE CHANGE: User signed in, loading project')
-          getActiveProject()
+          console.log('🔄 AUTH STATE CHANGE: User signed in, checking if project reload needed')
+          
+          // CRITICAL FIX: Don't reload project if we already have an active project AND upload is in progress
+          // The SIGNED_IN event often fires during token refresh, not actual user login
+          if (activeProject && isUploadInProgress) {
+            console.log('🚨 CRITICAL FIX: Preventing project reload during upload - SIGNED_IN event blocked')
+            console.log('📱 Upload in progress, maintaining current project to prevent photo loss')
+          } else if (activeProject && activeProject.id) {
+            console.log('🔄 AUTH STATE CHANGE: Already have active project, skipping reload to prevent disruption')
+          } else {
+            console.log('🔄 AUTH STATE CHANGE: No active project, loading project')
+            getActiveProject()
+          }
         } else if (event === 'TOKEN_REFRESHED') {
           console.log('🔄 AUTH STATE CHANGE: Token refreshed - checking if project reload needed')
           // CRITICAL FIX: Don't reload project during token refresh if we already have an active project
