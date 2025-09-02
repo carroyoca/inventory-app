@@ -432,6 +432,11 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
       const completedUploads = await Promise.all(uploadPromises)
       console.log("🎉 All uploads completed successfully:", completedUploads)
       
+      // CRITICAL FIX: Clear photos array after successful upload to prevent temporary files
+      console.log("🧹 SUCCESS CLEANUP: Clearing photos array after successful uploads")
+      setPhotos([]) // Remove all files from pending photos array
+      setUploadingPhotos(new Map()) // Clear all upload states
+      
       // Clear input values to prevent resubmission issues
       if (galleryInputRef.current) galleryInputRef.current.value = ''
       if (cameraInputRef.current) cameraInputRef.current.value = ''
@@ -452,6 +457,48 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
     } catch (error) {
       console.error("❌ Upload batch failed:", error)
       setIsUploadingAny(false)
+      
+      // CRITICAL FIX: Clear failed files from photos array to prevent temporary file display
+      console.log("🧹 CLEANUP: Removing failed uploads from photos array")
+      console.log("🧹 Before cleanup:", {
+        photosCount: photos.length,
+        uploadedPhotosCount: uploadedPhotos.length,
+        failedFiles: fileArray.map(f => f.name)
+      })
+      
+      // Remove the files that failed to upload from the photos array
+      setPhotos((prevPhotos) => {
+        const remainingPhotos = prevPhotos.filter(photo => {
+          // Keep photos that are NOT in the current failed batch
+          const isFailedFile = fileArray.some(failedFile => 
+            failedFile.name === photo.name && 
+            failedFile.size === photo.size
+          )
+          return !isFailedFile
+        })
+        console.log("🧹 After cleanup:", {
+          removedCount: prevPhotos.length - remainingPhotos.length,
+          remainingCount: remainingPhotos.length
+        })
+        return remainingPhotos
+      })
+      
+      // Clear upload states for failed files
+      setUploadingPhotos((prev) => {
+        const newMap = new Map()
+        // Keep only states for successfully uploaded photos
+        prev.forEach((value, key) => {
+          if (value === false) { // Completed upload
+            newMap.set(key, value)
+          }
+          // Remove in-progress uploads (value === true) as they failed
+        })
+        console.log("🧹 Upload states cleaned:", {
+          previousStates: prev.size,
+          cleanedStates: newMap.size
+        })
+        return newMap
+      })
       
       // UPLOAD GUARD: Notify parent about upload failure
       if (onUploadProgressChange) {
@@ -808,22 +855,35 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
     
     console.log('✅ Form validation passed')
     
-    // Check if there are pending photo uploads using Map
+    // ENHANCED UPLOAD CHECK: Only block if actively uploading, not for failed/temporary files
     const stillUploading = Array.from(uploadingPhotos.values()).some(uploading => uploading === true)
-    if (isUploadingAny || stillUploading || (photos.length > 0 && uploadedPhotos.length < photos.length)) {
-      console.log("⏳ Upload check failed:", {
-        isUploadingAny,
-        stillUploading,
-        photosLength: photos.length,
-        uploadedPhotosLength: uploadedPhotos.length,
-        uploadingStates: uploadingPhotos.size
-      })
+    
+    console.log("🔍 ENHANCED upload check:", {
+      isUploadingAny,
+      stillUploading,
+      photosLength: photos.length,
+      uploadedPhotosLength: uploadedPhotos.length,
+      uploadingStates: uploadingPhotos.size,
+      activeUploads: Array.from(uploadingPhotos.entries()).filter(([key, value]) => value === true)
+    })
+    
+    // CRITICAL FIX: Only block submission if uploads are ACTIVELY in progress
+    if (isUploadingAny || stillUploading) {
+      console.log("⏳ Upload check failed - uploads actively in progress")
       toast({
         title: "⏳ Photos Still Uploading",
-        description: `Please wait for all ${photos.length} photos to finish uploading before submitting.`,
+        description: "Please wait for photos to finish uploading before submitting.",
         variant: "destructive"
       })
       return
+    }
+    
+    // CRITICAL FIX: Clean up any remaining temporary files before submission
+    if (photos.length > 0) {
+      console.log("🧹 FORM CLEANUP: Removing temporary files before submission")
+      console.log("🧹 Clearing", photos.length, "temporary files:", photos.map(p => p.name))
+      setPhotos([]) // Clear any remaining temporary files
+      setUploadingPhotos(new Map()) // Clear upload states
     }
     
     // Warn if no photos but allow submission
