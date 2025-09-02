@@ -177,6 +177,18 @@ export default function InventoryPage() {
       <ProjectHeader />
 
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
+        {/* Botón volver al Dashboard */}
+        <div className="mb-6">
+          <Button 
+            variant="outline" 
+            onClick={() => router.push('/dashboard')}
+            className="border-purple-200 text-purple-600 hover:bg-purple-50"
+          >
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Volver al Dashboard
+          </Button>
+        </div>
+
         {/* Header Section */}
         <div className="mb-8">
           <div className="flex items-center justify-between mb-6">

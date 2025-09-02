@@ -14,7 +14,6 @@ import {
   BarChart3, 
   Users, 
   ArrowRight,
-  ArrowLeft,
   TrendingUp,
   DollarSign,
   Calendar,
@@ -124,18 +123,6 @@ export default function DashboardPage() {
       <ProjectHeader />
       
       <main className="relative z-10 max-w-7xl mx-auto px-6 py-8">
-        {/* Botón volver al Dashboard */}
-        <div className="mb-4">
-          <Button 
-            variant="outline" 
-            onClick={() => { try { router.back() } catch { router.push('/dashboard') } }}
-            className="border-purple-200 text-purple-600 hover:bg-purple-50"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            Volver al Dashboard
-          </Button>
-        </div>
-
         {/* Sección de bienvenida */}
         <div className="text-center mb-12">
           <h1 className="text-4xl md:text-5xl font-bold text-gray-900 mb-4">
