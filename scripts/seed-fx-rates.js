@@ -1,4 +1,4 @@
-// Seed fx_rates from local ARS CSV and ECB (Frankfurter) for USD
+// Seed fx_rates from local ARS & USD CSV, with fallback to ECB (Frankfurter) for USD
 // Usage: node scripts/seed-fx-rates.js
 require('dotenv').config({ path: '.env.local' })
 const fs = require('fs')
@@ -63,7 +63,48 @@ async function seedARSFromCsv() {
   }
 }
 
-async function seedUSDFromFrankfurter() {
+function resolveUsdCsvPath() {
+  const candidates = [
+    path.join(process.cwd(), 'public', 'Datos históricos USD_EUR.csv'),
+    path.join(process.cwd(), 'public', 'Datos históricos USD_EUR.csv'), // alt accent form
+  ]
+  for (const p of candidates) if (fs.existsSync(p)) return p
+  return null
+}
+
+async function seedUSDFromCsvOrFrankfurter() {
+  const csvPath = resolveUsdCsvPath()
+  if (csvPath) {
+    console.log('Seeding USD from CSV:', csvPath)
+    const content = fs.readFileSync(csvPath, 'utf8')
+    const lines = content.split(/\r?\n/).filter(Boolean)
+    const yearBuckets = new Map()
+    for (let i = 1; i < lines.length; i++) {
+      const line = lines[i]
+      const cols = line.split(',').map(c => c.replace(/^\"|\"$/g, ''))
+      const fecha = cols[0] // dd.mm.yyyy
+      const ultimo = cols[1]
+      if (!fecha || !ultimo) continue
+      const [dd, mm, yyyy] = fecha.split('.')
+      const year = Number.parseInt(yyyy, 10)
+      if (!Number.isInteger(year)) continue
+      const eurPerUsd = parseSpanishCsvNumber(ultimo)
+      if (eurPerUsd == null) continue
+      if (!yearBuckets.has(year)) yearBuckets.set(year, [])
+      yearBuckets.get(year).push(eurPerUsd)
+    }
+    for (const [year, arr] of yearBuckets.entries()) {
+      if (year < 1999) continue
+      const avgEurPerUsd = arr.reduce((a, b) => a + b, 0) / arr.length
+      const usdPerEur = 1 / avgEurPerUsd // store as currency per 1 EUR
+      const rateDate = `${year}-01-15`
+      console.log('Upserting USD', { year, usdPerEur })
+      await upsertRate(rateDate, 'USD', Number(usdPerEur.toFixed(6)), 'csv:USD_EUR')
+    }
+    return
+  }
+
+  // Fallback: Frankfurter (ECB)
   const currentYear = new Date().getFullYear()
   for (let year = 1999; year <= currentYear; year++) {
     const from = `${year}-01-01`
@@ -88,7 +129,7 @@ async function seedUSDFromFrankfurter() {
 async function main() {
   try {
     await seedARSFromCsv()
-    await seedUSDFromFrankfurter()
+    await seedUSDFromCsvOrFrankfurter()
     console.log('✅ Seeding completed')
   } catch (e) {
     console.error('Seeding error:', e)
@@ -97,4 +138,3 @@ async function main() {
 }
 
 main()
-
