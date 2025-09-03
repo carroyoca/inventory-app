@@ -53,6 +53,14 @@ interface InventoryItem {
   photos: string[]
   created_at: string
   project_id: string
+  year_of_purchase?: number | null
+  purchase_currency?: 'USD' | 'EUR' | 'ARS' | null
+  purchase_price?: number | null
+  price_eur_at_purchase?: number | null
+  weight_kg?: number | null
+  length_cm?: number | null
+  width_cm?: number | null
+  height_cm?: number | null
 }
 
 interface InventoryFormProps {
@@ -80,6 +88,56 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
   const uploadedPhotosRef = useRef<UploadedPhoto[]>([])
   const { activeProject, setUploadInProgress } = useProject()
   const { recordItemAdded, recordPhotoAdded } = useAchievements()
+  // New purchase and physical fields
+  const [purchaseCurrency, setPurchaseCurrency] = useState<'USD' | 'EUR' | 'ARS' | ''>(initialData?.purchase_currency || '')
+  const [yearOfPurchase, setYearOfPurchase] = useState<string>(initialData?.year_of_purchase ? String(initialData.year_of_purchase) : '')
+  const [purchasePrice, setPurchasePrice] = useState<string>(initialData?.purchase_price != null ? String(initialData.purchase_price) : '')
+  const [eurAtPurchase, setEurAtPurchase] = useState<string>(initialData?.price_eur_at_purchase != null ? String(initialData.price_eur_at_purchase) : '')
+  const [weightKg, setWeightKg] = useState<string>(initialData?.weight_kg != null ? String(initialData.weight_kg) : '')
+  const [lengthCm, setLengthCm] = useState<string>(initialData?.length_cm != null ? String(initialData.length_cm) : '')
+  const [widthCm, setWidthCm] = useState<string>(initialData?.width_cm != null ? String(initialData.width_cm) : '')
+  const [heightCm, setHeightCm] = useState<string>(initialData?.height_cm != null ? String(initialData.height_cm) : '')
+  const currentYear = new Date().getFullYear()
+
+  async function computeEurAtPurchase(): Promise<number | null> {
+    const y = parseInt(yearOfPurchase)
+    const cur = purchaseCurrency as 'USD' | 'EUR' | 'ARS'
+    const val = parseFloat(purchasePrice)
+    if (!purchasePrice || !purchaseCurrency || !yearOfPurchase || Number.isNaN(y) || Number.isNaN(val)) return null
+    if (y < 1999) return null
+    if (cur === 'EUR') return Number.isFinite(val) ? Math.round(val * 100) / 100 : null
+    try {
+      const date = `${y}-01-15`
+      const url = `https://api.exchangerate.host/${date}?base=EUR&symbols=${cur}`
+      const res = await fetch(url)
+      if (!res.ok) return null
+      const data = await res.json()
+      const rate = data?.rates?.[cur]
+      if (!rate || !Number.isFinite(rate)) return null
+      // Base EUR => amount in EUR = amount_in_cur / rate[cur]
+      const eur = val / rate
+      return Math.round(eur * 100) / 100
+    } catch {
+      return null
+    }
+  }
+
+  useEffect(() => {
+    (async () => {
+      const y = parseInt(yearOfPurchase)
+      if (!purchasePrice || !purchaseCurrency || !yearOfPurchase || Number.isNaN(y)) {
+        setEurAtPurchase('')
+        return
+      }
+      if (y < 1999) {
+        setEurAtPurchase('')
+        return
+      }
+      const eur = await computeEurAtPurchase()
+      setEurAtPurchase(eur != null ? String(eur) : '')
+    })()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [purchasePrice, purchaseCurrency, yearOfPurchase])
   
   // Add render tracking to debug state loss
   console.log('🔄 InventoryForm render:', {
@@ -923,7 +981,7 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         mode: mode
       })
 
-      const itemData = {
+      const itemData: any = {
         product_type: formData.get("product_type"),
         house_zone: formData.get("house_zone"),
         product_name: formData.get("product_name"),
@@ -936,6 +994,21 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         listing_link: formData.get("listing_link"),
         photos: photoUrls,
         project_id: activeProject.id,
+        year_of_purchase: yearOfPurchase ? parseInt(yearOfPurchase) : null,
+        purchase_currency: purchaseCurrency || null,
+        purchase_price: purchasePrice ? Number.parseFloat(purchasePrice) : null,
+        weight_kg: weightKg ? Number.parseFloat(weightKg) : null,
+        length_cm: lengthCm ? Number.parseFloat(lengthCm) : null,
+        width_cm: widthCm ? Number.parseFloat(widthCm) : null,
+        height_cm: heightCm ? Number.parseFloat(heightCm) : null,
+      }
+
+      // Compute EUR at purchase if eligible
+      if (itemData.year_of_purchase && itemData.year_of_purchase >= 1999 && itemData.purchase_currency && itemData.purchase_price) {
+        const eur = await computeEurAtPurchase()
+        itemData.price_eur_at_purchase = eur != null ? eur : null
+      } else {
+        itemData.price_eur_at_purchase = null
       }
       
       console.log('📦 Item data constructed for database:', {
@@ -1163,6 +1236,80 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
               )}
             </SelectContent>
           </Select>
+        </div>
+      </div>
+
+      {/* Información de compra */}
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="purchase_price" className="text-sm font-medium">Precio de compra</Label>
+          <Input
+            id="purchase_price"
+            name="purchase_price"
+            type="number"
+            step="0.01"
+            placeholder="0.00"
+            value={purchasePrice}
+            onChange={(e) => setPurchasePrice(e.target.value)}
+            className="h-11 sm:h-10"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="purchase_currency" className="text-sm font-medium">Moneda</Label>
+          <Select value={purchaseCurrency || ''} onValueChange={(v) => setPurchaseCurrency(v as any)}>
+            <SelectTrigger className="h-11 sm:h-10">
+              <SelectValue placeholder="Seleccionar moneda" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="USD">USD</SelectItem>
+              <SelectItem value="EUR">EUR</SelectItem>
+              <SelectItem value="ARS">ARS</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="year_of_purchase" className="text-sm font-medium">Año de compra</Label>
+          <Input
+            id="year_of_purchase"
+            name="year_of_purchase"
+            type="number"
+            min={1950}
+            max={new Date().getFullYear()}
+            placeholder="YYYY"
+            value={yearOfPurchase}
+            onChange={(e) => setYearOfPurchase(e.target.value)}
+            className="h-11 sm:h-10"
+          />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+        <div className="space-y-2">
+          <Label className="text-sm font-medium">Precio en EUR (año de compra)</Label>
+          <Input value={eurAtPurchase} readOnly placeholder={yearOfPurchase && parseInt(yearOfPurchase) < 1999 ? 'No soportado antes de 1999' : '—'} className="h-11 sm:h-10" />
+          {yearOfPurchase && parseInt(yearOfPurchase) < 1999 && (
+            <p className="text-xs text-gray-500">Conversión a EUR no disponible para años anteriores a 1999.</p>
+          )}
+        </div>
+      </div>
+
+      {/* Peso y dimensiones */}
+      <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 sm:gap-4">
+        <div className="space-y-2">
+          <Label htmlFor="weight_kg" className="text-sm font-medium">Peso (kg)</Label>
+          <Input id="weight_kg" name="weight_kg" type="number" step="0.01" value={weightKg} onChange={(e) => setWeightKg(e.target.value)} className="h-11 sm:h-10" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="length_cm" className="text-sm font-medium">Largo (cm)</Label>
+          <Input id="length_cm" name="length_cm" type="number" step="0.01" value={lengthCm} onChange={(e) => setLengthCm(e.target.value)} className="h-11 sm:h-10" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="width_cm" className="text-sm font-medium">Ancho (cm)</Label>
+          <Input id="width_cm" name="width_cm" type="number" step="0.01" value={widthCm} onChange={(e) => setWidthCm(e.target.value)} className="h-11 sm:h-10" />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="height_cm" className="text-sm font-medium">Alto (cm)</Label>
+          <Input id="height_cm" name="height_cm" type="number" step="0.01" value={heightCm} onChange={(e) => setHeightCm(e.target.value)} className="h-11 sm:h-10" />
         </div>
       </div>
 

@@ -28,6 +28,14 @@ interface InventoryItem {
   listing_link: string | null
   photos: string[]
   created_at: string
+  year_of_purchase?: number | null
+  purchase_currency?: 'USD' | 'EUR' | 'ARS' | null
+  purchase_price?: number | null
+  price_eur_at_purchase?: number | null
+  weight_kg?: number | null
+  length_cm?: number | null
+  width_cm?: number | null
+  height_cm?: number | null
 }
 
 interface SearchFilters {

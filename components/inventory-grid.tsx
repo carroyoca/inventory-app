@@ -24,6 +24,10 @@ interface InventoryItem {
   listing_link: string | null
   photos: string[]
   created_at: string
+  weight_kg?: number | null
+  length_cm?: number | null
+  width_cm?: number | null
+  height_cm?: number | null
 }
 
 interface InventoryGridProps {
@@ -172,6 +176,20 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
                 <MapPin className="h-3 w-3" />
                 {item.house_zone}
               </div>
+
+              {/* Physical details */}
+              {(item.weight_kg != null || item.length_cm != null || item.width_cm != null || item.height_cm != null) && (
+                <div className="text-xs sm:text-sm text-gray-600 flex flex-col gap-1">
+                  {item.weight_kg != null && (
+                    <div>Peso: <span className="font-medium">{item.weight_kg} kg</span></div>
+                  )}
+                  {(item.length_cm != null || item.width_cm != null || item.height_cm != null) && (
+                    <div>
+                      Dimensiones: <span className="font-medium">{item.length_cm ?? '—'} × {item.width_cm ?? '—'} × {item.height_cm ?? '—'} cm</span>
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* Product ID */}
               {item.product_id && <div className="text-xs text-gray-500">ID: {item.product_id}</div>}
