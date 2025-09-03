@@ -1,6 +1,30 @@
 import { NextRequest, NextResponse } from 'next/server'
 
+export const runtime = 'nodejs'
+
 type Currency = 'USD' | 'EUR' | 'ARS'
+
+async function getRateFromExchangerateHost(year: number, currency: 'USD'|'EUR'|'ARS') {
+  const date = `${year}-01-15`
+  const url = `https://api.exchangerate.host/${date}?base=EUR&symbols=${currency}`
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) return null
+  const data: any = await res.json()
+  const rate = data?.rates?.[currency]
+  return (typeof rate === 'number' && Number.isFinite(rate)) ? rate : null
+}
+
+async function getRateFromFrankfurter(year: number, currency: 'USD'|'EUR'|'ARS') {
+  // Frankfurter reliably supports USD; ARS may not be available.
+  if (currency === 'ARS') return null
+  const date = `${year}-01-15`
+  const url = `https://api.frankfurter.app/${date}?from=EUR&to=${currency}`
+  const res = await fetch(url, { cache: 'no-store' })
+  if (!res.ok) return null
+  const data: any = await res.json()
+  const rate = data?.rates?.[currency]
+  return (typeof rate === 'number' && Number.isFinite(rate)) ? rate : null
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -28,7 +52,6 @@ export async function POST(request: NextRequest) {
 
     // Try providers with fallbacks
     let rate: number | null = null
-    // Prefer Frankfurter for USD; exchangerate.host for ARS
     if (currency === 'USD') {
       rate = await getRateFromFrankfurter(year, currency)
       if (rate == null) rate = await getRateFromExchangerateHost(year, currency)
@@ -36,7 +59,6 @@ export async function POST(request: NextRequest) {
       rate = await getRateFromExchangerateHost(year, currency)
       if (rate == null) rate = await getRateFromFrankfurter(year, currency)
     } else {
-      // Fallback order for other supported currencies
       rate = await getRateFromExchangerateHost(year, currency)
       if (rate == null) rate = await getRateFromFrankfurter(year, currency)
     }
@@ -45,29 +67,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Rate provider error' }, { status: 502 })
     }
 
-export const runtime = 'nodejs'
-
-async function getRateFromExchangerateHost(year: number, currency: 'USD'|'EUR'|'ARS') {
-  const date = `${year}-01-15`
-  const url = `https://api.exchangerate.host/${date}?base=EUR&symbols=${currency}`
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) return null
-  const data: any = await res.json()
-  const rate = data?.rates?.[currency]
-  return (typeof rate === 'number' && Number.isFinite(rate)) ? rate : null
-}
-
-async function getRateFromFrankfurter(year: number, currency: 'USD'|'EUR'|'ARS') {
-  // Frankfurter reliably supports USD; ARS may not be available.
-  if (currency === 'ARS') return null
-  const date = `${year}-01-15`
-  const url = `https://api.frankfurter.app/${date}?from=EUR&to=${currency}`
-  const res = await fetch(url, { cache: 'no-store' })
-  if (!res.ok) return null
-  const data: any = await res.json()
-  const rate = data?.rates?.[currency]
-  return (typeof rate === 'number' && Number.isFinite(rate)) ? rate : null
-}
     const eur = amount / rate
     return NextResponse.json({ eur: Math.round(eur * 100) / 100, rate })
   } catch (error) {
