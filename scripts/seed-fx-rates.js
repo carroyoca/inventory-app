@@ -20,9 +20,35 @@ async function upsertRate(rateDate, currency, rate, source) {
   if (error) throw error
 }
 
+function parseCsvLine(line) {
+  const out = []
+  let cur = ''
+  let inQuotes = false
+  for (let i = 0; i < line.length; i++) {
+    const ch = line[i]
+    if (ch === '"') {
+      inQuotes = !inQuotes
+      continue
+    }
+    if (ch === ',' && !inQuotes) {
+      out.push(cur)
+      cur = ''
+    } else {
+      cur += ch
+    }
+  }
+  out.push(cur)
+  return out
+}
+
 function parseSpanishCsvNumber(s) {
   // Replace dot thousand separators and comma decimal separators
-  const cleaned = String(s).trim().replace(/\./g, '').replace(',', '.')
+  const cleaned = String(s)
+    .trim()
+    .replace(/\u00A0/g, ' ') // non-breaking space
+    .replace(/\./g, '')      // remove thousands separators
+    .replace(/,/, '.')        // first comma to dot
+    .replace(/,/g, '')        // remove any extra commas
   const n = Number.parseFloat(cleaned)
   return Number.isFinite(n) ? n : null
 }
@@ -39,7 +65,7 @@ async function seedARSFromCsv() {
   const yearBuckets = new Map()
   for (let i = 1; i < lines.length; i++) {
     const line = lines[i]
-    const cols = line.split(',').map(c => c.replace(/^\"|\"$/g, ''))
+    const cols = parseCsvLine(line).map(c => c.replace(/^\"|\"$/g, ''))
     // Expect: Fecha, Último, Apertura, ...
     const fecha = cols[0] // dd.mm.yyyy
     const ultimo = cols[1]
@@ -49,12 +75,15 @@ async function seedARSFromCsv() {
     if (!Number.isInteger(year)) continue
     const valueEurPerArs = parseSpanishCsvNumber(ultimo)
     if (valueEurPerArs == null) continue
+    if (valueEurPerArs <= 0) continue
     if (!yearBuckets.has(year)) yearBuckets.set(year, [])
     yearBuckets.get(year).push(valueEurPerArs)
   }
   for (const [year, arr] of yearBuckets.entries()) {
     if (year < 1999) continue
+    if (!arr || arr.length === 0) continue
     const avgEurPerArs = arr.reduce((a, b) => a + b, 0) / arr.length
+    if (!Number.isFinite(avgEurPerArs) || avgEurPerArs <= 0) continue
     // store as ARS per 1 EUR (base EUR expected by app)
     const arsPerEur = 1 / avgEurPerArs
     const rateDate = `${year}-01-15`
@@ -81,7 +110,7 @@ async function seedUSDFromCsvOrFrankfurter() {
     const yearBuckets = new Map()
     for (let i = 1; i < lines.length; i++) {
       const line = lines[i]
-      const cols = line.split(',').map(c => c.replace(/^\"|\"$/g, ''))
+      const cols = parseCsvLine(line).map(c => c.replace(/^\"|\"$/g, ''))
       const fecha = cols[0] // dd.mm.yyyy
       const ultimo = cols[1]
       if (!fecha || !ultimo) continue
@@ -90,12 +119,15 @@ async function seedUSDFromCsvOrFrankfurter() {
       if (!Number.isInteger(year)) continue
       const eurPerUsd = parseSpanishCsvNumber(ultimo)
       if (eurPerUsd == null) continue
+      if (eurPerUsd <= 0) continue
       if (!yearBuckets.has(year)) yearBuckets.set(year, [])
       yearBuckets.get(year).push(eurPerUsd)
     }
     for (const [year, arr] of yearBuckets.entries()) {
       if (year < 1999) continue
+      if (!arr || arr.length === 0) continue
       const avgEurPerUsd = arr.reduce((a, b) => a + b, 0) / arr.length
+      if (!Number.isFinite(avgEurPerUsd) || avgEurPerUsd <= 0) continue
       const usdPerEur = 1 / avgEurPerUsd // store as currency per 1 EUR
       const rateDate = `${year}-01-15`
       console.log('Upserting USD', { year, usdPerEur })
