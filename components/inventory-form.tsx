@@ -105,18 +105,16 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
     const val = parseFloat(purchasePrice)
     if (!purchasePrice || !purchaseCurrency || !yearOfPurchase || Number.isNaN(y) || Number.isNaN(val)) return null
     if (y < 1999) return null
-    if (cur === 'EUR') return Number.isFinite(val) ? Math.round(val * 100) / 100 : null
     try {
-      const date = `${y}-01-15`
-      const url = `https://api.exchangerate.host/${date}?base=EUR&symbols=${cur}`
-      const res = await fetch(url)
+      const res = await fetch('/api/currency/convert', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency: cur, amount: val, year: y })
+      })
       if (!res.ok) return null
       const data = await res.json()
-      const rate = data?.rates?.[cur]
-      if (!rate || !Number.isFinite(rate)) return null
-      // Base EUR => amount in EUR = amount_in_cur / rate[cur]
-      const eur = val / rate
-      return Math.round(eur * 100) / 100
+      const eur = data?.eur
+      return typeof eur === 'number' && Number.isFinite(eur) ? eur : null
     } catch {
       return null
     }
