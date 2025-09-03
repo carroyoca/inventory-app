@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createServiceRoleClient } from '@/lib/supabase/api-client'
 
 export const runtime = 'nodejs'
 
@@ -49,6 +50,23 @@ export async function POST(request: NextRequest) {
     if (currency === 'EUR') {
       return NextResponse.json({ eur: Math.round(amount * 100) / 100, rate: 1 })
     }
+
+    // 1) Try DB (fx_rates)
+    try {
+      const supabase = createServiceRoleClient()
+      const rateDate = `${year}-01-15`
+      const { data: row } = await supabase
+        .from('fx_rates')
+        .select('rate')
+        .eq('base_currency', 'EUR')
+        .eq('currency', currency)
+        .eq('rate_date', rateDate)
+        .maybeSingle()
+      if (row?.rate && Number.isFinite(row.rate as number)) {
+        const eur = amount / (row.rate as number)
+        return NextResponse.json({ eur: Math.round(eur * 100) / 100, rate: row.rate, source: 'db' })
+      }
+    } catch {}
 
     // Try providers with fallbacks
     let rate: number | null = null
