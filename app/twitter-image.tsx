@@ -8,8 +8,6 @@ export const size = {
 export const contentType = 'image/png'
 
 export default async function Image() {
-  const logoData = await fetch(new URL('../public/humkio.png', import.meta.url)).then((res) => res.arrayBuffer())
-
   return new ImageResponse(
     (
       <div
@@ -33,12 +31,6 @@ export default async function Image() {
             boxShadow: '0 20px 60px rgba(0,0,0,0.12)',
           }}
         >
-          <img
-            src={logoData as any}
-            width={180}
-            height={180}
-            style={{ borderRadius: 20, objectFit: 'cover' }}
-          />
           <div style={{ display: 'flex', flexDirection: 'column' }}>
             <div
               style={{
