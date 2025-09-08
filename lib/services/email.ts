@@ -47,14 +47,14 @@ export async function sendInvitationEmail({
     console.log('📧 Preparing email with URL:', joinUrl)
     
     const messageData = {
-      from: `Art Inventory <noreply@${mailgunDomain}>`,
+      from: `humkio <noreply@${mailgunDomain}>`,
       to: [to],
       subject: `Invitación para unirse al proyecto ${projectName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>¡Has sido invitado a un proyecto!</h2>
           <p>Hola,</p>
-          <p><strong>${inviterName}</strong> (${inviterEmail}) te ha invitado a unirte al proyecto <strong>${projectName}</strong> en Art Inventory.</p>
+          <p><strong>${inviterName}</strong> (${inviterEmail}) te ha invitado a unirte al proyecto <strong>${projectName}</strong> en humkio.</p>
           <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Proyecto:</strong> ${projectName}</p>
             <p><strong>Rol asignado:</strong> ${role === 'owner' ? 'Propietario' : role === 'manager' ? 'Administrador' : role === 'member' ? 'Miembro' : 'Solo Lectura'}</p>
@@ -63,7 +63,7 @@ export async function sendInvitationEmail({
           
           <div style="background-color: #fef3c7; border: 1px solid #f59e0b; padding: 15px; border-radius: 8px; margin: 20px 0;">
             <h3 style="color: #d97706; margin-top: 0;">⚠️ IMPORTANTE: Debes crear una cuenta primero</h3>
-            <p style="margin-bottom: 10px;"><strong>Antes de unirte al proyecto, necesitas crear una cuenta en Art Inventory.</strong></p>
+            <p style="margin-bottom: 10px;"><strong>Antes de unirte al proyecto, necesitas crear una cuenta en humkio.</strong></p>
             <p style="margin-bottom: 0;">Si ya tienes una cuenta, simplemente inicia sesión y luego haz clic en "Unirse al Proyecto".</p>
           </div>
           
@@ -80,7 +80,7 @@ export async function sendInvitationEmail({
             <h4 style="margin-top: 0;">📋 Pasos para unirte al proyecto:</h4>
             <ol style="margin: 0; padding-left: 20px;">
               <li><strong>Crear cuenta:</strong> Si no tienes una cuenta, haz clic en "Crear Cuenta Nueva"</li>
-              <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en Art Inventory</li>
+              <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en humkio</li>
               <li><strong>Unirse al proyecto:</strong> Una vez autenticado, haz clic en "Unirse al Proyecto"</li>
             </ol>
           </div>
@@ -142,14 +142,14 @@ export async function sendAccessNotificationEmail({
     console.log('📧 Using from address:', `noreply@${mailgunDomain}`)
     
     const messageData = {
-      from: `Art Inventory <noreply@${mailgunDomain}>`,
+      from: `humkio <noreply@${mailgunDomain}>`,
       to: [to],
       subject: `Acceso concedido al proyecto ${projectName}`,
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <h2>¡Tienes acceso a un proyecto!</h2>
           <p>Hola,</p>
-          <p><strong>${grantedBy}</strong> te ha concedido acceso al proyecto <strong>${projectName}</strong> en Art Inventory.</p>
+          <p><strong>${grantedBy}</strong> te ha concedido acceso al proyecto <strong>${projectName}</strong> en humkio.</p>
           
           <div style="background-color: #f9fafb; padding: 20px; border-radius: 8px; margin: 20px 0;">
             <p><strong>Proyecto:</strong> ${projectName}</p>
@@ -176,7 +176,7 @@ export async function sendAccessNotificationEmail({
             <h4 style="margin-top: 0;">📋 Cómo acceder al proyecto:</h4>
             <ol style="margin: 0; padding-left: 20px;">
               <li><strong>Crear cuenta:</strong> Si no tienes una cuenta, haz clic en "Crear Cuenta Nueva"</li>
-              <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en Art Inventory</li>
+              <li><strong>Iniciar sesión:</strong> Si ya tienes cuenta, inicia sesión en humkio</li>
               <li><strong>Acceso automático:</strong> Una vez autenticado, verás el proyecto en tu dashboard</li>
             </ol>
           </div>

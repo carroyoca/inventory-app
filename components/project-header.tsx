@@ -22,6 +22,7 @@ import {
   X
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
+import Image from 'next/image'
 
 export function ProjectHeader() {
   const { activeProject, setActiveProject, refreshActiveProject, clearProjectState } = useProject()
@@ -64,10 +65,10 @@ export function ProjectHeader() {
         {/* Logo y Título */}
         <div className="flex items-center space-x-2 md:space-x-4">
           <div className="flex items-center space-x-2">
-            <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl">
-              <FolderOpen className="w-5 h-5 md:w-6 md:h-6 text-white" />
+            <div className="w-8 h-8 md:w-9 md:h-9 relative rounded-xl overflow-hidden bg-white">
+              <Image src="/humkio.png" alt="humkio" fill sizes="36px" className="object-cover" />
             </div>
-            <h1 className="text-lg md:text-xl font-bold text-gray-900">Inventory App</h1>
+            <h1 className="text-lg md:text-xl font-bold text-gray-900">humkio</h1>
           </div>
           
           {/* Separador - Hidden on mobile */}

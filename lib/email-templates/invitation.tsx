@@ -41,7 +41,7 @@ export const InvitationEmail = ({
       <Preview>Invitación para unirse al proyecto {projectName}</Preview>
       <Body style={main}>
         <Container style={container}>
-          <Text style={logo}>Art Inventory</Text>
+          <Text style={logo}>humkio</Text>
           
           <Text style={heading}>¡Has sido invitado a un proyecto!</Text>
           
@@ -51,7 +51,7 @@ export const InvitationEmail = ({
           
           <Text style={paragraph}>
             <strong>{inviterName}</strong> ({inviterEmail}) te ha invitado a unirte al proyecto{' '}
-            <strong>{projectName}</strong> en Art Inventory.
+            <strong>{projectName}</strong> en humkio.
           </Text>
           
           <Section style={detailsContainer}>
@@ -118,7 +118,7 @@ export const InvitationEmail = ({
           </Text>
           
           <Text style={footer}>
-            Art Inventory - Sistema de gestión de inventario basado en proyectos
+            humkio - Sistema de gestión de inventario basado en proyectos
           </Text>
         </Container>
       </Body>

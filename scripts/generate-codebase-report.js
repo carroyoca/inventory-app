@@ -102,8 +102,8 @@ function sectionFileSummaries(doc) {
 }
 
 function sectionOverview(doc) {
-  heading(doc, 'Art Inventory App — Engineering Overview', 1)
-  para(doc, 'A modern inventory app built with Next.js 15, React 18, TypeScript, Tailwind v4, and Supabase. It supports multi-project organization, secure authentication, photo uploads via Vercel Blob, and collaborative access management. The UI is component-driven using shadcn/ui and Radix primitives, with a project context managing cross-page state.')
+  heading(doc, 'humkio — Engineering Overview', 1)
+  para(doc, 'humkio is a modern inventory app built with Next.js 15, React 18, TypeScript, Tailwind v4, and Supabase. It supports multi-project organization, secure authentication, photo uploads via Vercel Blob, and collaborative access management. The UI is component-driven using shadcn/ui and Radix primitives, with a project context managing cross-page state.')
   hr(doc)
 }
 
@@ -230,7 +230,7 @@ function build() {
   doc.pipe(fs.createWriteStream(OUTPUT))
 
   // Cover
-  doc.font('Helvetica-Bold').fontSize(24).text('Inventory App — Codebase Overview Report')
+  doc.font('Helvetica-Bold').fontSize(24).text('humkio — Codebase Overview Report')
   doc.moveDown(0.5)
   doc.font('Helvetica').fontSize(12).text('An approachable, in-depth explanation for early-stage software engineers.', { align: 'left' })
   doc.moveDown(1)
@@ -262,4 +262,3 @@ if (require.main === module) {
   const out = build()
   console.log(`✅ PDF report generated: ${out}`)
 }
-

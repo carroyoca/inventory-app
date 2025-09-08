@@ -1,6 +1,6 @@
-# 🎨 Art Inventory App
+# humkio
 
-A modern, full-stack web application for managing art collections with ease. Built with Next.js 15, React 18, TypeScript, and Supabase.
+A modern, full-stack web application for managing inventory with ease. Built with Next.js 15, React 18, TypeScript, and Supabase.
 
 ## ✨ Features
 

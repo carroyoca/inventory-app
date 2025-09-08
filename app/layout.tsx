@@ -8,9 +8,26 @@ import { ThemeProvider } from '@/components/theme-provider'
 import { Toaster } from '@/components/ui/toaster'
 
 export const metadata: Metadata = {
-  title: 'Inventory App - Gestión de Proyectos',
-  description: 'Sistema de inventario basado en proyectos para organizar y gestionar objetos',
+  title: 'humkio — Gestión de Proyectos',
+  description: 'humkio: sistema de inventario basado en proyectos para organizar y gestionar objetos',
   generator: 'v0.app',
+  icons: {
+    icon: '/humkio.png',
+    apple: '/humkio.png',
+  },
+  openGraph: {
+    title: 'humkio',
+    description: 'Sistema de inventario basado en proyectos',
+    url: '/',
+    siteName: 'humkio',
+    locale: 'es_ES',
+    type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'humkio',
+    description: 'Sistema de inventario basado en proyectos',
+  },
 }
 
 export default function RootLayout({

@@ -91,10 +91,11 @@ export default function ProjectsPage() {
       <header className="bg-white/80 backdrop-blur-sm border-b border-gray-200/50 px-6 py-4 sticky top-0 z-50">
         <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center space-x-2">
-            <div className="p-2 bg-gradient-to-br from-purple-500 to-blue-500 rounded-xl">
-              <FolderOpen className="w-6 h-6 text-white" />
+            <div className="w-9 h-9 relative rounded-xl overflow-hidden bg-white">
+              {/* Using the public brand logo */}
+              <img src="/humkio.png" alt="humkio" className="w-full h-full object-cover" />
             </div>
-            <h1 className="text-xl font-bold text-gray-900">Inventory App</h1>
+            <h1 className="text-xl font-bold text-gray-900">humkio</h1>
           </div>
           <Button 
             variant="outline"
