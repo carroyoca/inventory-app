@@ -14,10 +14,12 @@ const supabase = createClient(supabaseUrl, supabaseKey)
 
 async function executeMigration() {
   try {
-    console.log('🚀 === EXECUTING PENDING ACCESS TABLE MIGRATION ===')
+    const fileArg = process.argv[2] || process.env.MIGRATION_FILE || 'scripts/017_add_listing_fields.sql'
+    console.log('🚀 === EXECUTING MIGRATION ===')
+    console.log('📄 File:', fileArg)
     
     // Read the migration script
-    const migrationSQL = fs.readFileSync('scripts/012_create_pending_access_table.sql', 'utf8')
+    const migrationSQL = fs.readFileSync(fileArg, 'utf8')
     
     console.log('📝 Migration script loaded, executing...')
     
@@ -28,31 +30,11 @@ async function executeMigration() {
       console.error('❌ Migration failed:', error)
       
       // Try alternative approach - execute parts individually
-      console.log('🔄 Trying step-by-step execution...')
-      
-      // Create table first
-      const createTableSQL = `
-        CREATE TABLE IF NOT EXISTS public.pending_project_access (
-            id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
-            project_id uuid NOT NULL REFERENCES public.projects(id) ON DELETE CASCADE,
-            user_email text NOT NULL,
-            role text NOT NULL CHECK (role IN ('owner', 'manager', 'member', 'viewer')),
-            granted_by uuid NOT NULL REFERENCES public.profiles(id) ON DELETE CASCADE,
-            granted_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-            expires_at timestamp with time zone DEFAULT (timezone('utc'::text, now()) + interval '30 days'),
-            created_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL,
-            updated_at timestamp with time zone DEFAULT timezone('utc'::text, now()) NOT NULL
-        );
-      `
-      
-      const { error: tableError } = await supabase.rpc('exec_sql', { sql: createTableSQL })
-      
-      if (tableError) {
-        console.error('❌ Table creation failed:', tableError)
-      } else {
-        console.log('✅ Table created successfully')
-      }
-      
+      console.log('ℹ️ Could not execute via exec_sql. If your database does not have the exec_sql function, run the file manually in Supabase SQL Editor:')
+      console.log('--- BEGIN SQL ---')
+      console.log(migrationSQL)
+      console.log('--- END SQL ---')
+    
     } else {
       console.log('✅ Migration executed successfully:', data)
     }
