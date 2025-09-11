@@ -85,18 +85,23 @@ export async function POST(request: NextRequest) {
       console.warn('Photo URL not found on item; proceeding by request')
     }
 
-    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'))
-    const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 20000, 'image generate'))
+    const t0 = Date.now()
+    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 12000, 'image fetch'))
+    const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 30000, 'image generate'))
     const dataUrl = `data:image/png;base64,${b64}`
     if (!blobConfigured) return NextResponse.json({ success: true, url: dataUrl })
     try {
       const binary = Buffer.from(b64, 'base64')
       const filename = `ai/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-      const blob = await withTimeout(put(filename, binary, { access: 'public', contentType: 'image/png' }), 8000, 'blob upload')
-      return NextResponse.json({ success: true, url: blob.url })
+      const blob = await withTimeout(put(filename, binary, { access: 'public', contentType: 'image/png' }), 12000, 'blob upload')
+      const res = NextResponse.json({ success: true, url: blob.url })
+      res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
+      return res
     } catch (e) {
       console.error('Blob upload failed; returning data URL', e)
-      return NextResponse.json({ success: true, url: dataUrl })
+      const res = NextResponse.json({ success: true, url: dataUrl })
+      res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
+      return res
     }
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -105,4 +110,3 @@ export async function POST(request: NextRequest) {
 }
 
 export const maxDuration = 30
-

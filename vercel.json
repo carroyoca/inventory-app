@@ -7,10 +7,12 @@
       "maxDuration": 60
     },
     "app/api/ai/generate-image/route.ts": {
-      "maxDuration": 30
+      "maxDuration": 60,
+      "memory": 1024
     },
     "app/api/ai/generate-listing/route.ts": {
-      "maxDuration": 20
+      "maxDuration": 30,
+      "memory": 1024
     }
   },
   "headers": [
