@@ -17,16 +17,24 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
 }
 
 async function callGeminiListing({ apiKey, description }: { apiKey: string; description: string }) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`
-  const prompt = `You are an expert art appraiser and marketplace copywriter. Generate ONLY a valid JSON object in English with keys:\n{\n  "listing_title": "SEO-ready marketplace listing title (include artist, style, medium)",\n  "listing_description": "Professional, persuasive multi-paragraph listing body in English",\n  "analysis_text": "Concise internal notes in English: estimated price range and reasoning based on comparable works and signals",\n  "sources": [ {"title": "string", "url": "string"}, ... ]\n}\nUse web research with explicit sources. If data is insufficient, be clear. Input facts from the item: ${description}`
-  const body = { contents: [{ role: 'user', parts: [{ text: prompt }] }], tools: [{ googleSearch: {} }], generationConfig: { temperature: 0.6 } }
-  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!res.ok) { const text = await res.text(); throw new Error(`Gemini listing error: ${res.status} ${text}`) }
-  const data = await res.json()
-  const text = data?.candidates?.[0]?.content?.parts?.map((p: any) => p.text).join('') || ''
-  const match = text.match(/\{[\s\S]*\}/)
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = `You are an expert appraiser and marketplace copywriter. Use Google Search to research artist/work and comps. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on comparable works and signals\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.5-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { temperature: 0.6, tools: [{ googleSearch: {} }] },
+  })
+  const textOut = (resp as any)?.text || ''
+  const match = textOut.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('Gemini listing response did not contain JSON')
-  return JSON.parse(match[0])
+  const parsed = JSON.parse(match[0])
+  const chunks = (resp as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks || []
+  const sources = chunks
+    .map((c: any) => c?.web)
+    .filter((w: any) => w && (w.uri || w.title))
+    .map((w: any) => ({ title: w.title || '', url: w.uri || '' }))
+  return { ...parsed, sources: parsed.sources?.length ? parsed.sources : sources }
 }
 
 export async function POST(request: NextRequest) {
