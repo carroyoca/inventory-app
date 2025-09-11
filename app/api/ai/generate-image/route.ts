@@ -96,18 +96,10 @@ export async function POST(request: NextRequest) {
     const t0 = Date.now()
     // Keep retries bounded to fit Vercel function budget
     const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'), 2, 500)
-    // Generate three shots sequentially to avoid concurrency spikes
-    const shots = [
-      'Estilo frontal: toma principal, casi frontal, composición mínima, luz suave.',
-      'Estilo en ángulo: 30-45 grados, resalta profundidad del marco y textura.',
-      'Estilo detalle: primer plano de firma, textura o detalle del marco.',
-    ]
-    const urls: string[] = []
-    for (const instruction of shots) {
-      const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 20000, 'image generate'), 2, 600)
-      urls.push(`data:image/png;base64,${b64}`)
-    }
-    const res = NextResponse.json({ success: true, urls })
+    // Generate only one shot per image (frontal) to keep it simple and fast
+    const instruction = 'Estilo frontal: toma principal, casi frontal, composición mínima, luz suave.'
+    const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 20000, 'image generate'), 2, 600)
+    const res = NextResponse.json({ success: true, url: `data:image/png;base64,${b64}` })
     res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
     return res
   } catch (err) {

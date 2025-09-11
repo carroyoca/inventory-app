@@ -37,7 +37,7 @@ export default function AIStudioPage() {
   const [descDraft, setDescDraft] = useState('')
   // Listing fields are now always applied on server by default
   const { toast } = useToast()
-  const [imagesPerRun, setImagesPerRun] = useState(1)
+  const [selectedSourcePhotos, setSelectedSourcePhotos] = useState<Record<string, boolean>>({})
 
   useEffect(() => {
     const load = async () => {
@@ -55,19 +55,20 @@ export default function AIStudioPage() {
 
   const selectedItem = useMemo(() => items.find(i => i.id === selectedItemId) || null, [items, selectedItemId])
 
-  const handleGenerate = async () => {
+  const handleGenerateImages = async () => {
     try {
       setError(null)
       setLoading(true)
-      setResult(null)
+      setResult((prev) => prev || { success: true, imageUrls: [], listing_title: '', listing_description: '', analysis_text: '', sources: [] })
       const { data: session } = await supabase.auth.getSession()
       const token = session.session?.access_token
       if (!token) throw new Error('No auth token')
 
       if (!selectedItem) throw new Error('Select an item')
 
-      // Generate images per-photo via API (sequential); server returns 3 shots per photo
-      const targets = (selectedItem.photos || []).slice(0, imagesPerRun)
+      // Generate images for selected photos only, sequentially
+      const targets = (selectedItem.photos || []).filter((u) => selectedSourcePhotos[u])
+      if (!targets.length) throw new Error('Select at least one photo')
       const urls: string[] = []
       for (const photoUrl of targets) {
         const r = await fetch('/api/ai/generate-image', {
@@ -78,12 +79,47 @@ export default function AIStudioPage() {
         let j: any
         try { j = await r.json() } catch { j = { error: await r.text() } }
         if (!r.ok) throw new Error(j.details || j.error || 'Image generation failed')
-        const returned: string[] = Array.isArray(j.urls) ? j.urls : (j.url ? [j.url] : [])
-        if (!returned.length) throw new Error('Image generation returned no images')
-        for (const u of returned) urls.push(u)
+        const u = j.url as string
+        if (!u) throw new Error('Image generation returned no image')
+        urls.push(u)
       }
+      const gen: GenerateResponse = {
+        success: true,
+        imageUrls: urls,
+        listing_title: '',
+        listing_description: '',
+        analysis_text: '',
+        sources: [],
+      }
+      setResult((prev) => ({
+        success: true,
+        imageUrls: [ ...(prev?.imageUrls || []), ...gen.imageUrls ],
+        listing_title: prev?.listing_title || '',
+        listing_description: prev?.listing_description || '',
+        analysis_text: prev?.analysis_text || '',
+        sources: prev?.sources || [],
+      }))
+      const sel: Record<string, boolean> = {}
+      for (const u of [ ...(result?.imageUrls || []), ...urls ]) sel[u] = true
+      setSelectedImages(sel)
+      toast({ title: 'Images generated', description: 'Preview images are ready.' })
+    } catch (e) {
+      setError(e instanceof Error ? e.message : String(e))
+      toast({ title: 'Generation failed', description: String(e), variant: 'destructive' })
+    } finally {
+      setLoading(false)
+    }
+  }
 
-      // Generate listing separately
+  const handleGenerateListing = async () => {
+    try {
+      setError(null)
+      setLoading(true)
+      const { data: session } = await supabase.auth.getSession()
+      const token = session.session?.access_token
+      if (!token) throw new Error('No auth token')
+      if (!selectedItem) throw new Error('Select an item')
+
       const r2 = await fetch('/api/ai/generate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -93,24 +129,20 @@ export default function AIStudioPage() {
       try { j2 = await r2.json() } catch { j2 = { error: await r2.text() } }
       if (!r2.ok) throw new Error(j2.details || j2.error || 'Listing generation failed')
 
-      const gen: GenerateResponse = {
+      setResult((prev) => ({
         success: true,
-        imageUrls: urls,
+        imageUrls: prev?.imageUrls || [],
         listing_title: j2.listing_title || '',
         listing_description: j2.listing_description || '',
         analysis_text: j2.analysis_text || '',
         sources: j2.sources || [],
-      }
-      setResult(gen)
-      const sel: Record<string, boolean> = {}
-      for (const u of urls) sel[u] = true
-      setSelectedImages(sel)
-      setTitleDraft(gen.listing_title)
-      setDescDraft(gen.listing_description)
-      toast({ title: 'AI generated', description: 'Preview images and texts are ready.' })
+      }))
+      setTitleDraft(j2.listing_title || '')
+      setDescDraft(j2.listing_description || '')
+      toast({ title: 'Listing generated', description: 'Texts are ready.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
-      toast({ title: 'Generation failed', description: String(e), variant: 'destructive' })
+      toast({ title: 'Listing failed', description: String(e), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -180,34 +212,32 @@ export default function AIStudioPage() {
               ))}
             </select>
             <div className="mt-4">
-              <label className="block text-sm font-medium mb-2">Images per run</label>
-              <select
-                className="w-full border rounded-md p-2"
-                value={imagesPerRun}
-                onChange={(e) => setImagesPerRun(Number(e.target.value))}
-              >
-                <option value={1}>1</option>
-                <option value={2}>2</option>
-                <option value={3}>3</option>
-              </select>
-              <p className="text-xs text-gray-500 mt-1">Use 1–2 to avoid timeouts. Run multiple times for more.</p>
-            </div>
-            {selectedItem && (
-              <div className="mt-4 space-y-2">
-                <p className="text-sm text-gray-600">Fotos ({selectedItem.photos?.length || 0})</p>
-                <div className="grid grid-cols-3 gap-2">
-                  {(selectedItem.photos || []).slice(0, 6).map((url, i) => (
-                    <div key={i} className="relative w-full aspect-square overflow-hidden rounded-md border">
+              <label className="block text-sm font-medium mb-2">Select photos to process</label>
+              {selectedItem && (
+                <div className="grid grid-cols-3 gap-2 max-h-64 overflow-auto border rounded-md p-2 bg-white/30">
+                  {(selectedItem.photos || []).map((url, i) => (
+                    <label key={i} className="relative w-full aspect-square overflow-hidden rounded-md border block cursor-pointer">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
                       <img src={url} alt={`photo-${i}`} className="w-full h-full object-cover" />
-                    </div>
+                      <input
+                        type="checkbox"
+                        className="absolute top-2 left-2 h-5 w-5"
+                        checked={!!selectedSourcePhotos[url]}
+                        onChange={(e) => setSelectedSourcePhotos((s) => ({ ...s, [url]: e.target.checked }))}
+                      />
+                    </label>
                   ))}
                 </div>
-              </div>
-            )}
+              )}
+              <p className="text-xs text-gray-500 mt-1">Images are generated one-by-one for selected photos.</p>
+            </div>
+            
             <div className="mt-6 flex gap-3">
-              <Button onClick={handleGenerate} variant="brand" disabled={!selectedItemId || loading}>
-                {loading ? 'Generando…' : 'Generar'}
+              <Button onClick={handleGenerateImages} variant="brand" disabled={!selectedItemId || loading}>
+                {loading ? 'Generating…' : 'Generate Images'}
+              </Button>
+              <Button onClick={handleGenerateListing} variant="secondary" disabled={!selectedItemId || loading}>
+                {loading ? 'Generating…' : 'Generate Listing'}
               </Button>
             </div>
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
