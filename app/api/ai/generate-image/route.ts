@@ -97,8 +97,9 @@ export async function POST(request: NextRequest) {
     }
 
     const t0 = Date.now()
-    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 12000, 'image fetch'))
-    const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 30000, 'image generate'))
+    // Keep retries bounded to fit Vercel function budget
+    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'), 2, 500)
+    const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 20000, 'image generate'), 2, 600)
     const dataUrl = `data:image/png;base64,${b64}`
     if (!blobConfigured) return NextResponse.json({ success: true, url: dataUrl })
     try {
@@ -120,4 +121,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 30
+export const runtime = 'nodejs'
+export const maxDuration = 60

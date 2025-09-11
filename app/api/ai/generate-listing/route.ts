@@ -66,7 +66,8 @@ export async function POST(request: NextRequest) {
     if (!membership) return NextResponse.json({ error: 'No access to this project' }, { status: 403 })
 
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${(item as any).product_id ?? ''}; ${extraDescription || ''}`.trim()
-    const listing = await withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 15000, 'listing generate'))
+    // Keep total execution under function budget (30s): two attempts at ~13s each
+    const listing = await withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 13000, 'listing generate'), 2, 500)
     return NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',
@@ -80,5 +81,5 @@ export async function POST(request: NextRequest) {
   }
 }
 
-export const maxDuration = 20
-
+export const runtime = 'nodejs'
+export const maxDuration = 30
