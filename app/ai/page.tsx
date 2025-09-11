@@ -66,27 +66,45 @@ export default function AIStudioPage() {
 
       if (!selectedItem) throw new Error('Select an item')
 
-      const res = await fetch('/api/ai/generate', {
+      // Generate images per-photo via API to avoid serverless timeouts
+      const targets = (selectedItem.photos || []).slice(0, imagesPerRun)
+      const urls: string[] = []
+      for (const photoUrl of targets) {
+        const r = await fetch('/api/ai/generate-image', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+          body: JSON.stringify({ itemId: selectedItem.id, photoUrl }),
+        })
+        let j: any
+        try { j = await r.json() } catch { j = { error: await r.text() } }
+        if (!r.ok) throw new Error(j.details || j.error || 'Image generation failed')
+        urls.push(j.url)
+      }
+
+      // Generate listing separately
+      const r2 = await fetch('/api/ai/generate-listing', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ itemId: selectedItem.id, maxCount: imagesPerRun }),
+        body: JSON.stringify({ itemId: selectedItem.id }),
       })
-      let json: any
-      try {
-        json = await res.json()
-      } catch {
-        const text = await res.text()
-        throw new Error(text || 'Generation failed (non-JSON response)')
+      let j2: any
+      try { j2 = await r2.json() } catch { j2 = { error: await r2.text() } }
+      if (!r2.ok) throw new Error(j2.details || j2.error || 'Listing generation failed')
+
+      const gen: GenerateResponse = {
+        success: true,
+        imageUrls: urls,
+        listing_title: j2.listing_title || '',
+        listing_description: j2.listing_description || '',
+        analysis_text: j2.analysis_text || '',
+        sources: j2.sources || [],
       }
-      if (!res.ok) throw new Error(json.details || json.error || 'Generation failed')
-      const gen = json as GenerateResponse
       setResult(gen)
-      // initialize selections and drafts
       const sel: Record<string, boolean> = {}
-      for (const u of gen.imageUrls) sel[u] = true
+      for (const u of urls) sel[u] = true
       setSelectedImages(sel)
-      setTitleDraft(gen.listing_title || '')
-      setDescDraft(gen.listing_description || '')
+      setTitleDraft(gen.listing_title)
+      setDescDraft(gen.listing_description)
       toast({ title: 'AI generated', description: 'Preview images and texts are ready.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
