@@ -1,6 +1,7 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/api-client'
 import { put } from '@vercel/blob'
+import { GoogleGenAI, Modality } from '@google/genai'
 
 async function fetchAsBase64(url: string) {
   const res = await fetch(url)
@@ -27,18 +28,28 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
 }
 
 async function callGeminiImageTransform({ base64, mimeType, apiKey }: { base64: string; mimeType: string; apiKey: string }) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`
-  const body = {
-    contents: [{ role: 'user', parts: [ { inlineData: { data: base64, mimeType } }, { text: 'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG.' } ] }],
-    generationConfig: { temperature: 0.7 },
-  }
-  const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
-  if (!res.ok) { const text = await res.text(); throw new Error(`Gemini image gen error: ${res.status} ${text}`) }
-  const data = await res.json()
-  const parts = data?.candidates?.[0]?.content?.parts || []
+  const ai = new GoogleGenAI({ apiKey })
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image-preview',
+    contents: {
+      parts: [
+        { inlineData: { data: base64, mimeType } },
+        {
+          text:
+            'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG.',
+        },
+      ],
+    },
+    config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
+  })
+
+  const parts = resp?.candidates?.[0]?.content?.parts || []
   const imgPart = parts.find((p: any) => p.inlineData && p.inlineData.data)
-  if (!imgPart) throw new Error('Gemini did not return image data')
-  return imgPart.inlineData.data as string
+  if (imgPart?.inlineData?.data) return imgPart.inlineData.data as string
+
+  const textOut = (resp as any)?.text?.trim?.() || ''
+  if (textOut) throw new Error(`Gemini returned no image. Details: ${textOut}`)
+  throw new Error('Gemini did not return image data')
 }
 
 export async function POST(request: NextRequest) {
