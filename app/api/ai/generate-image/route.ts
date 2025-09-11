@@ -1,6 +1,6 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/api-client'
-import { put } from '@vercel/blob'
+import { GoogleGenAI, Modality } from '@google/genai'
 
 async function fetchAsBase64(url: string) {
   const res = await fetch(url)
@@ -26,43 +26,27 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
   throw lastErr
 }
 
-async function callGeminiImageTransform({ base64, mimeType, apiKey }: { base64: string; mimeType: string; apiKey: string }) {
-  const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash-image-preview:generateContent?key=${apiKey}`
-  const body = {
-    contents: [
-      {
-        role: 'user',
-        parts: [
-          { inlineData: { data: base64, mimeType } },
-          {
-            text:
-              'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG.',
-          },
-        ],
-      },
-    ],
-    // Note: response_mime_type only supports text types on REST; omit for image output
-    generationConfig: { temperature: 0.7 },
-  }
-  const res = await fetch(endpoint, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
+async function generateShot({ base64, mimeType, apiKey, instruction }: { base64: string; mimeType: string; apiKey: string; instruction: string }) {
+  const ai = new GoogleGenAI({ apiKey })
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.5-flash-image-preview',
+    contents: {
+      parts: [
+        { inlineData: { data: base64, mimeType } },
+        {
+          text:
+            'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG. ' + instruction,
+        },
+      ],
+    },
+    config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
   })
-  if (!res.ok) {
-    const text = await res.text()
-    const rid = res.headers.get('x-request-id') || res.headers.get('x-guploader-uploadid') || 'n/a'
-    throw new Error(`Gemini image gen error: ${res.status} ${text} (req: ${rid})`)
-  }
-  const data = await res.json()
-  const parts = data?.candidates?.[0]?.content?.parts || []
+  const parts = resp?.candidates?.[0]?.content?.parts || []
   const imgPart = parts.find((p: any) => p.inlineData && p.inlineData.data)
-  if (!imgPart) {
-    const text = parts.map((p: any) => p.text).filter(Boolean).join(' ').trim()
-    if (text) throw new Error(`Gemini returned no image. Details: ${text}`)
-    throw new Error('Gemini did not return image data')
-  }
-  return imgPart.inlineData.data as string
+  if (imgPart?.inlineData?.data) return imgPart.inlineData.data as string
+  const textOut = (resp as any)?.text?.trim?.() || ''
+  if (textOut) throw new Error(`Gemini returned no image. Details: ${textOut}`)
+  throw new Error('Gemini did not return image data')
 }
 
 export async function POST(request: NextRequest) {
@@ -112,22 +96,20 @@ export async function POST(request: NextRequest) {
     const t0 = Date.now()
     // Keep retries bounded to fit Vercel function budget
     const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'), 2, 500)
-    const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 20000, 'image generate'), 2, 600)
-    const dataUrl = `data:image/png;base64,${b64}`
-    if (!blobConfigured) return NextResponse.json({ success: true, url: dataUrl })
-    try {
-      const binary = Buffer.from(b64, 'base64')
-      const filename = `ai/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-      const blob = await withTimeout(put(filename, binary, { access: 'public', contentType: 'image/png' }), 12000, 'blob upload')
-      const res = NextResponse.json({ success: true, url: blob.url })
-      res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
-      return res
-    } catch (e) {
-      console.error('Blob upload failed; returning data URL', e)
-      const res = NextResponse.json({ success: true, url: dataUrl })
-      res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
-      return res
+    // Generate three shots sequentially to avoid concurrency spikes
+    const shots = [
+      'Estilo frontal: toma principal, casi frontal, composición mínima, luz suave.',
+      'Estilo en ángulo: 30-45 grados, resalta profundidad del marco y textura.',
+      'Estilo detalle: primer plano de firma, textura o detalle del marco.',
+    ]
+    const urls: string[] = []
+    for (const instruction of shots) {
+      const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 20000, 'image generate'), 2, 600)
+      urls.push(`data:image/png;base64,${b64}`)
     }
+    const res = NextResponse.json({ success: true, urls })
+    res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
+    return res
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: 'Generate image failed', details: msg }, { status: 500 })

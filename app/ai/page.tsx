@@ -66,7 +66,7 @@ export default function AIStudioPage() {
 
       if (!selectedItem) throw new Error('Select an item')
 
-      // Generate images per-photo via API to avoid serverless timeouts
+      // Generate images per-photo via API (sequential); server returns 3 shots per photo
       const targets = (selectedItem.photos || []).slice(0, imagesPerRun)
       const urls: string[] = []
       for (const photoUrl of targets) {
@@ -78,7 +78,9 @@ export default function AIStudioPage() {
         let j: any
         try { j = await r.json() } catch { j = { error: await r.text() } }
         if (!r.ok) throw new Error(j.details || j.error || 'Image generation failed')
-        urls.push(j.url)
+        const returned: string[] = Array.isArray(j.urls) ? j.urls : (j.url ? [j.url] : [])
+        if (!returned.length) throw new Error('Image generation returned no images')
+        for (const u of returned) urls.push(u)
       }
 
       // Generate listing separately
