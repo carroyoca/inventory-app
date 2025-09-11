@@ -205,8 +205,6 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const productIdVal = (item as any).product_id ?? ''
-    const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${productIdVal}; ${body.extraDescription || ''}`.trim()
     // Await listing result within remaining time budget; otherwise return partial
     const remaining = Math.max(1000, timeBudgetMs - (Date.now() - startTime))
     let listing: any = null
