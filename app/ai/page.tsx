@@ -157,7 +157,28 @@ export default function AIStudioPage() {
       const token = session.session?.access_token
       if (!token) throw new Error('No auth token')
 
-      const images = Object.entries(selectedImages).filter(([, v]) => v).map(([u]) => u)
+      // Prepare images: pre-upload any data URLs to blob to avoid large payloads (413)
+      const selected = Object.entries(selectedImages).filter(([, v]) => v).map(([u]) => u)
+      const images: string[] = []
+      for (const u of selected) {
+        if (u.startsWith('data:image/')) {
+          try {
+            const resp = await fetch('/api/ai/upload', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+              body: JSON.stringify({ dataUrl: u }),
+            })
+            const j = await resp.json()
+            if (!resp.ok) throw new Error(j.details || j.error || 'Upload failed')
+            images.push(j.url)
+          } catch (e) {
+            // As a fallback keep the original data URL (server will try to upload), but this increases payload size
+            images.push(u)
+          }
+        } else {
+          images.push(u)
+        }
+      }
       const res = await fetch('/api/ai/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
@@ -180,6 +201,10 @@ export default function AIStudioPage() {
       }
       if (!res.ok) throw new Error(json.details || json.error || 'Apply failed')
       toast({ title: 'Applied', description: 'Images and listing saved to item.' })
+      // After applying, refresh selected item data and clear generation state
+      setResult(null)
+      setSelectedImages({})
+      setSelectedSourcePhotos({})
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
       toast({ title: 'Apply failed', description: String(e), variant: 'destructive' })
@@ -187,6 +212,16 @@ export default function AIStudioPage() {
       setApplying(false)
     }
   }
+
+  // When switching items, clear all generated previews and drafts
+  useEffect(() => {
+    setResult(null)
+    setSelectedImages({})
+    setSelectedSourcePhotos({})
+    setTitleDraft('')
+    setDescDraft('')
+    setError(null)
+  }, [selectedItemId])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
