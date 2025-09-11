@@ -50,6 +50,8 @@ interface InventoryItem {
   sale_price: number | null
   status: string
   listing_link: string | null
+  listing_title?: string | null
+  listing_description?: string | null
   photos: string[]
   created_at: string
   project_id: string
@@ -986,6 +988,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         product_id: formData.get("product_id"),
         description: formData.get("description"),
         notes: formData.get("notes"),
+        listing_title: (formData.get("listing_title") as string) || undefined,
+        listing_description: (formData.get("listing_description") as string) || undefined,
         estimated_price: Number.parseFloat(formData.get("estimated_price") as string) || null,
         sale_price: Number.parseFloat(formData.get("sale_price") as string) || null,
         status: formData.get("status"),
@@ -1684,6 +1688,32 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
             placeholder="https://..." 
             defaultValue={initialData?.listing_link || ''} 
             className="h-11 sm:h-10" 
+          />
+        </div>
+      </div>
+
+      {/* Marketplace Listing (AI) */}
+      <div className="mt-4 space-y-3">
+        <Label className="text-sm font-semibold text-gray-900">Marketplace Listing (AI)</Label>
+        <div className="space-y-2">
+          <Label htmlFor="listing_title" className="text-sm font-medium">Listing Title (English)</Label>
+          <Input
+            id="listing_title"
+            name="listing_title"
+            placeholder="SEO-friendly title"
+            defaultValue={initialData?.listing_title || ''}
+            className="h-11 sm:h-10"
+          />
+        </div>
+        <div className="space-y-2">
+          <Label htmlFor="listing_description" className="text-sm font-medium">Listing Description (English)</Label>
+          <Textarea
+            id="listing_description"
+            name="listing_description"
+            placeholder="Persuasive, professional description for marketplaces"
+            defaultValue={initialData?.listing_description || ''}
+            rows={5}
+            className="resize-none"
           />
         </div>
       </div>

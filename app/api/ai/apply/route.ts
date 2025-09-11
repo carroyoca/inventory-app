@@ -11,13 +11,11 @@ type ApplyRequest = {
   updateListingFields?: boolean
 }
 
-function buildNotesAppend({ listing_title, listing_description, analysis_text, sources }: { listing_title?: string; listing_description?: string; analysis_text?: string; sources?: { title?: string; url?: string }[] }) {
+function buildNotesAppend({ analysis_text, sources }: { analysis_text?: string; sources?: { title?: string; url?: string }[] }) {
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const lines: string[] = []
   lines.push('—')
   lines.push(`[${ts}] AI analysis (humkio)`) // English notes block
-  if (listing_title) lines.push(`Title: ${listing_title.trim()}`)
-  if (listing_description) lines.push(`Description:\n${listing_description.trim()}`)
   if (analysis_text) lines.push(analysis_text.trim())
   if (sources && sources.length) {
     lines.push('Sources:')
@@ -87,16 +85,17 @@ export async function POST(request: NextRequest) {
     const currentPhotos: string[] = Array.isArray(item.photos) ? item.photos : []
     const uploaded = await ensureUploadedUrls(body.imageUrls || [])
     const newPhotos = [...currentPhotos, ...uploaded]
-    const notesAppend = buildNotesAppend({ listing_title: body.listing_title, listing_description: body.listing_description, analysis_text: body.analysis_text, sources: body.sources })
+    const notesAppend = buildNotesAppend({ analysis_text: body.analysis_text, sources: body.sources })
     const newNotes = item.notes ? `${item.notes}\n\n${notesAppend}` : notesAppend
 
     const updatePayload: any = {
       photos: newPhotos,
       notes: newNotes,
     }
-    if (body.updateListingFields) {
-      if (body.listing_title != null) updatePayload.listing_title = body.listing_title
-      if (body.listing_description != null) updatePayload.listing_description = body.listing_description
+    const shouldUpdateListing = body.updateListingFields ?? true
+    if (shouldUpdateListing) {
+      if (typeof body.listing_title !== 'undefined') updatePayload.listing_title = body.listing_title
+      if (typeof body.listing_description !== 'undefined') updatePayload.listing_description = body.listing_description
     }
 
     const { data: updated, error: updErr } = await supabase

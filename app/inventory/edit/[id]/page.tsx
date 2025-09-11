@@ -22,6 +22,8 @@ interface InventoryItem {
   sale_price: number | null
   status: string
   listing_link: string | null
+  listing_title?: string | null
+  listing_description?: string | null
   photos: string[]
   created_at: string
   project_id: string

@@ -34,7 +34,7 @@ export default function AIStudioPage() {
   const [selectedImages, setSelectedImages] = useState<Record<string, boolean>>({})
   const [titleDraft, setTitleDraft] = useState('')
   const [descDraft, setDescDraft] = useState('')
-  const [applyListingFields, setApplyListingFields] = useState(false)
+  // Listing fields are now always applied on server by default
 
   useEffect(() => {
     const load = async () => {
@@ -105,7 +105,7 @@ export default function AIStudioPage() {
           listing_description: descDraft,
           analysis_text: result.analysis_text,
           sources: result.sources,
-          updateListingFields: applyListingFields,
+          // updateListingFields intentionally omitted; server defaults to true
         }),
       })
       const json = await res.json()
@@ -211,12 +211,7 @@ export default function AIStudioPage() {
                     </div>
                   )}
                 </div>
-                <div className="pt-2 flex items-center gap-3">
-                  <label className="flex items-center gap-2 text-sm text-gray-700">
-                    <input type="checkbox" checked={applyListingFields} onChange={(e) => setApplyListingFields(e.target.checked)} />
-                    Also update listing_title and listing_description fields
-                  </label>
-                </div>
+                {/* Listing fields are always updated; no toggle needed */}
                 <div className="pt-2">
                   <Button onClick={handleApply} disabled={applying}>
                     {applying ? 'Applying…' : 'Apply to Item'}
