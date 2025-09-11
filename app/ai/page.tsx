@@ -37,6 +37,7 @@ export default function AIStudioPage() {
   const [descDraft, setDescDraft] = useState('')
   // Listing fields are now always applied on server by default
   const { toast } = useToast()
+  const [imagesPerRun, setImagesPerRun] = useState(1)
 
   useEffect(() => {
     const load = async () => {
@@ -68,7 +69,7 @@ export default function AIStudioPage() {
       const res = await fetch('/api/ai/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
-        body: JSON.stringify({ itemId: selectedItem.id }),
+        body: JSON.stringify({ itemId: selectedItem.id, maxCount: imagesPerRun }),
       })
       let json: any
       try {
@@ -158,6 +159,19 @@ export default function AIStudioPage() {
                 </option>
               ))}
             </select>
+            <div className="mt-4">
+              <label className="block text-sm font-medium mb-2">Images per run</label>
+              <select
+                className="w-full border rounded-md p-2"
+                value={imagesPerRun}
+                onChange={(e) => setImagesPerRun(Number(e.target.value))}
+              >
+                <option value={1}>1</option>
+                <option value={2}>2</option>
+                <option value={3}>3</option>
+              </select>
+              <p className="text-xs text-gray-500 mt-1">Use 1–2 to avoid timeouts. Run multiple times for more.</p>
+            </div>
             {selectedItem && (
               <div className="mt-4 space-y-2">
                 <p className="text-sm text-gray-600">Fotos ({selectedItem.photos?.length || 0})</p>

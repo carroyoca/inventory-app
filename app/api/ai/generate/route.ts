@@ -164,13 +164,20 @@ export async function POST(request: NextRequest) {
     const photos: string[] = Array.isArray(body.photoUrls) && body.photoUrls.length > 0 ? body.photoUrls : Array.isArray(item.photos) ? item.photos : []
     if (!photos.length) return NextResponse.json({ error: 'This item has no photos' }, { status: 400 })
     // Limit default generation to 3 to stay within function timeout reliably
-    const maxCount = Math.min(body.maxCount ?? 3, photos.length, 3)
+    // Default to 1 image per run; user can override via UI up to 3
+    const maxCount = Math.min(body.maxCount ?? 1, photos.length, 3)
     const selected = photos.slice(0, maxCount)
 
     // Fetch and generate with retries; limit concurrency by doing sequentially
     const startTime = Date.now()
     const timeBudgetMs = 55000 // ensure we return before platform timeout (60s)
     const generated: string[] = []
+    // Kick off listing generation concurrently (doesn't depend on images)
+    const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${(item as any).product_id ?? ''}; ${body.extraDescription || ''}`.trim()
+    const listingPromise: Promise<any> = withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 15000, 'listing generate')).catch((e) => {
+      console.error('Listing generation failed:', e)
+      return null
+    })
     for (const url of selected) {
       if (Date.now() - startTime > timeBudgetMs) {
         console.warn('Time budget reached, returning partial results')
@@ -200,15 +207,23 @@ export async function POST(request: NextRequest) {
 
     const productIdVal = (item as any).product_id ?? ''
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${productIdVal}; ${body.extraDescription || ''}`.trim()
-    const listing = await withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 15000, 'listing generate'))
+    // Await listing result within remaining time budget; otherwise return partial
+    const remaining = Math.max(1000, timeBudgetMs - (Date.now() - startTime))
+    let listing: any = null
+    try {
+      listing = await withTimeout(listingPromise, remaining, 'listing wait')
+    } catch (e) {
+      console.warn('Returning without listing due to time budget:', e)
+      listing = null
+    }
 
     return NextResponse.json({
       success: true,
       imageUrls: generated,
-      listing_title: listing.listing_title || '',
-      listing_description: listing.listing_description || '',
-      analysis_text: listing.analysis_text || '',
-      sources: Array.isArray(listing.sources) ? listing.sources : [],
+      listing_title: listing?.listing_title || '',
+      listing_description: listing?.listing_description || '',
+      analysis_text: listing?.analysis_text || '',
+      sources: Array.isArray(listing?.sources) ? listing.sources : [],
     })
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
