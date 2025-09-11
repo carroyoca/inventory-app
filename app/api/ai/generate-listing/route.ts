@@ -21,7 +21,7 @@ type ListingOut = { listing_title?: string; listing_description?: string; analys
 async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `You are an expert appraiser and marketplace copywriter. Use Google Search to research artist/work and comps. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on comparable works and signals\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const prompt = `You are an expert appraiser and marketplace copywriter. Use Google Search to research the artist/work and comparable sales. First extract factual details, then write the listing using those facts. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English. MUST incorporate extracted facts such as product_id/serial, year/period, medium/materials, dimensions, condition, provenance/history, and notable context from sources, when available.\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on comparable works and signals. Reference key facts you extracted.\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
@@ -42,7 +42,7 @@ async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: st
 async function callGeminiListingQuick({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `You are an expert appraiser and marketplace copywriter. No web search. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on provided facts\",\n  \"sources\": []\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const prompt = `You are an expert appraiser and marketplace copywriter. No web search. First extract factual details from the provided facts; then write the listing using those facts. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English. MUST incorporate extracted facts such as product_id/serial, year/period, medium/materials, dimensions, condition, provenance/history, when available.\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on the provided facts\",\n  \"sources\": []\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
@@ -57,6 +57,7 @@ async function callGeminiListingQuick({ apiKey, description }: { apiKey: string;
 
 export async function POST(request: NextRequest) {
   try {
+    const t0 = Date.now()
     const apiKey = process.env.GEMINI_API_KEY
     if (!apiKey) return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 })
 
@@ -94,22 +95,28 @@ export async function POST(request: NextRequest) {
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${(item as any).product_id ?? ''}; ${extraDescription || ''}`.trim()
     const useSearch = body?.useSearch !== false
     let listing: ListingOut
+    let mode: 'search' | 'quick' = 'search'
     if (useSearch) {
       try {
         listing = await withTimeout(callGeminiListingWithSearch({ apiKey, description: desc }), 18000, 'listing generate (search)')
       } catch (e) {
+        mode = 'quick'
         listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing generate (quick)')
       }
     } else {
+      mode = 'quick'
       listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 12000, 'listing generate (quick)')
     }
-    return NextResponse.json({
+    const res = NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',
       listing_description: listing?.listing_description || '',
       analysis_text: listing?.analysis_text || '',
       sources: Array.isArray(listing?.sources) ? listing.sources : [],
+      mode,
     })
+    res.headers.set('X-List-Duration-ms', String(Date.now() - t0))
+    return res
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
     return NextResponse.json({ error: 'Generate listing failed', details: msg }, { status: 500 })
