@@ -41,7 +41,8 @@ async function callGeminiImageTransform({ base64, mimeType, apiKey }: { base64: 
         ],
       },
     ],
-    generationConfig: { temperature: 0.7, response_mime_type: 'image/png' },
+    // Note: response_mime_type only supports text types on REST; omit for image output
+    generationConfig: { temperature: 0.7 },
   }
   const res = await fetch(endpoint, {
     method: 'POST',

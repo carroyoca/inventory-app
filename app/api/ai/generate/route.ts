@@ -59,7 +59,8 @@ async function callGeminiImageTransform({
         ],
       },
     ],
-    generationConfig: { temperature: 0.7, response_mime_type: 'image/png' },
+    // REST does not accept image MIME here; omit and read inlineData image
+    generationConfig: { temperature: 0.7 },
   }
   const res = await fetch(endpoint, {
     method: 'POST',
