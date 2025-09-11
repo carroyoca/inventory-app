@@ -34,6 +34,7 @@ interface ProjectCategory {
 
 const STATUS_OPTIONS = [
   { value: "available", label: "Disponible" },
+  { value: "published", label: "Publicado" },
   { value: "sold", label: "Vendido" },
   { value: "reserved", label: "Reservado" },
   { value: "not_for_sale", label: "No a la venta" },

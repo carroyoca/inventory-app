@@ -37,6 +37,7 @@ interface InventoryGridProps {
 
 const statusColors = {
   available: "bg-green-100 text-green-800",
+  published: "bg-indigo-100 text-indigo-800",
   sold: "bg-blue-100 text-blue-800",
   reserved: "bg-orange-100 text-orange-800",
   not_for_sale: "bg-gray-100 text-gray-800",
@@ -131,6 +132,7 @@ export function InventoryGrid({ items, onItemDeleted }: InventoryGridProps) {
   const statusLabel = (status: string) => {
     switch (status) {
       case 'available': return 'Disponible'
+      case 'published': return 'Publicado'
       case 'sold': return 'Vendido'
       case 'reserved': return 'Reservado'
       case 'not_for_sale': return 'No a la venta'

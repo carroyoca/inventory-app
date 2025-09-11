@@ -92,6 +92,8 @@ export function RecentItems({ projectId }: RecentItemsProps) {
     switch (status) {
       case 'available':
         return 'bg-green-100 text-green-800'
+      case 'published':
+        return 'bg-indigo-100 text-indigo-800'
       case 'sold':
         return 'bg-red-100 text-red-800'
       case 'reserved':
@@ -107,6 +109,8 @@ export function RecentItems({ projectId }: RecentItemsProps) {
     switch (status) {
       case 'available':
         return 'Disponible'
+      case 'published':
+        return 'Publicado'
       case 'sold':
         return 'Vendido'
       case 'reserved':
