@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import Image from 'next/image'
+import { useToast } from '@/hooks/use-toast'
 import { useProject } from '@/contexts/ProjectContext'
 
 type InventoryItem = {
@@ -35,6 +36,7 @@ export default function AIStudioPage() {
   const [titleDraft, setTitleDraft] = useState('')
   const [descDraft, setDescDraft] = useState('')
   // Listing fields are now always applied on server by default
+  const { toast } = useToast()
 
   useEffect(() => {
     const load = async () => {
@@ -78,8 +80,10 @@ export default function AIStudioPage() {
       setSelectedImages(sel)
       setTitleDraft(gen.listing_title || '')
       setDescDraft(gen.listing_description || '')
+      toast({ title: 'AI generated', description: 'Preview images and texts are ready.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      toast({ title: 'Generation failed', description: String(e), variant: 'destructive' })
     } finally {
       setLoading(false)
     }
@@ -110,22 +114,25 @@ export default function AIStudioPage() {
       })
       const json = await res.json()
       if (!res.ok) throw new Error(json.details || json.error || 'Apply failed')
+      toast({ title: 'Applied', description: 'Images and listing saved to item.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
+      toast({ title: 'Apply failed', description: String(e), variant: 'destructive' })
     } finally {
       setApplying(false)
     }
   }
 
   return (
-    <div className="min-h-screen bg-white">
-      <div className="max-w-7xl mx-auto px-4 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold">AI Studio</h1>
+    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-blue-50 to-indigo-50">
+      <div className="max-w-7xl mx-auto px-4 py-10">
+        <div className="mb-8 text-center">
+          <h1 className="text-3xl font-bold text-gray-900">AI Studio</h1>
+          <p className="text-gray-600 mt-2">Generate ready-to-sell images and English listings. Select what to keep and apply to your item.</p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-1 bg-white border rounded-xl p-4">
+          <div className="lg:col-span-1 bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-5">
             <label className="block text-sm font-medium mb-2">Selecciona un ítem</label>
             <select
               className="w-full border rounded-md p-2"
@@ -160,7 +167,7 @@ export default function AIStudioPage() {
             {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
           </div>
 
-          <div className="lg:col-span-2 bg-white border rounded-xl p-4">
+          <div className="lg:col-span-2 bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-5">
             {!result ? (
               <div className="text-gray-500 text-sm">Resultados aparecerán aquí.</div>
             ) : (
@@ -213,7 +220,7 @@ export default function AIStudioPage() {
                 </div>
                 {/* Listing fields are always updated; no toggle needed */}
                 <div className="pt-2">
-                  <Button onClick={handleApply} disabled={applying}>
+                  <Button onClick={handleApply} variant="brand" disabled={applying}>
                     {applying ? 'Applying…' : 'Apply to Item'}
                   </Button>
                 </div>

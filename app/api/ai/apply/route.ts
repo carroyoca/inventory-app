@@ -11,6 +11,18 @@ type ApplyRequest = {
   updateListingFields?: boolean
 }
 
+function cleanSource(url?: string, title?: string) {
+  if (!url && !title) return null
+  try {
+    const u = url ? new URL(url) : null
+    const host = u?.hostname?.replace(/^www\./, '') || ''
+    const label = title?.trim() || host || 'Source'
+    return `${label}${host ? ` — ${host}` : ''}`
+  } catch {
+    return title?.trim() || 'Source'
+  }
+}
+
 function buildNotesAppend({ analysis_text, sources }: { analysis_text?: string; sources?: { title?: string; url?: string }[] }) {
   const ts = new Date().toISOString().replace('T', ' ').slice(0, 16)
   const lines: string[] = []
@@ -20,9 +32,8 @@ function buildNotesAppend({ analysis_text, sources }: { analysis_text?: string; 
   if (sources && sources.length) {
     lines.push('Sources:')
     for (const s of sources) {
-      const t = s.title?.trim() || s.url?.trim() || 'Fuente'
-      const u = s.url?.trim() ? ` (${s.url.trim()})` : ''
-      lines.push(`- ${t}${u}`)
+      const cleaned = cleanSource(s.url, s.title)
+      if (cleaned) lines.push(`- ${cleaned}`)
     }
   }
   return lines.join('\n')

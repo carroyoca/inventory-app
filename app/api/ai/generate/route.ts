@@ -19,6 +19,20 @@ async function fetchAsBase64(url: string) {
   return { base64, mimeType: contentType }
 }
 
+async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 400): Promise<T> {
+  let lastErr: any
+  for (let i = 0; i < attempts; i++) {
+    try {
+      return await fn()
+    } catch (e) {
+      lastErr = e
+      const delay = baseDelayMs * Math.pow(2, i)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+  throw lastErr
+}
+
 async function callGeminiImageTransform({
   base64,
   mimeType,
@@ -145,38 +159,34 @@ export async function POST(request: NextRequest) {
     const maxCount = Math.max(1, Math.min(body.maxCount ?? photos.length, photos.length, 6))
     const selected = photos.slice(0, maxCount)
 
-    const base64s = await Promise.all(
-      selected.map(async (url) => {
-        const { base64, mimeType } = await fetchAsBase64(url)
-        return { base64, mimeType }
-      }),
-    )
-
-    // Generate one image per input
-    const generated = await Promise.all(
-      base64s.map(async (img) => {
-        const b64 = await callGeminiImageTransform({ base64: img.base64, mimeType: img.mimeType, apiKey })
+    // Fetch and generate with retries; limit concurrency by doing sequentially
+    const generated: string[] = []
+    for (const url of selected) {
+      try {
+        const { base64, mimeType } = await withRetry(() => fetchAsBase64(url))
+        const b64 = await withRetry(() => callGeminiImageTransform({ base64, mimeType, apiKey }))
         const dataUrl = `data:image/png;base64,${b64}`
         if (!blobConfigured) {
-          // Fallback: return data URL in dev when Blob token is missing
-          return dataUrl
+          generated.push(dataUrl)
+          continue
         }
         try {
-          // Upload to Blob
           const binary = Buffer.from(b64, 'base64')
           const filename = `ai/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
           const blob = await put(filename, binary, { access: 'public', contentType: 'image/png' })
-          return blob.url
+          generated.push(blob.url)
         } catch (e) {
           console.error('Blob upload failed, returning data URL fallback:', e)
-          return dataUrl
+          generated.push(dataUrl)
         }
-      }),
-    )
+      } catch (e) {
+        console.error('Generation failed for one photo:', e)
+      }
+    }
 
     const productIdVal = (item as any).product_id ?? ''
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${productIdVal}; ${body.extraDescription || ''}`.trim()
-    const listing = await callGeminiListing({ apiKey, description: desc })
+    const listing = await withRetry(() => callGeminiListing({ apiKey, description: desc }))
 
     return NextResponse.json({
       success: true,
