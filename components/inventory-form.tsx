@@ -981,6 +981,12 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         mode: mode
       })
 
+      // Normalize listing fields (allow empty string to clear, but keep type as string|null)
+      const listingTitleRaw = formData.get("listing_title") as string | null
+      const listingDescRaw = formData.get("listing_description") as string | null
+      const listingTitle = listingTitleRaw != null ? String(listingTitleRaw) : null
+      const listingDescription = listingDescRaw != null ? String(listingDescRaw) : null
+
       const itemData: any = {
         product_type: formData.get("product_type"),
         house_zone: formData.get("house_zone"),
@@ -988,8 +994,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         product_id: formData.get("product_id"),
         description: formData.get("description"),
         notes: formData.get("notes"),
-        listing_title: (formData.get("listing_title") as string) || undefined,
-        listing_description: (formData.get("listing_description") as string) || undefined,
+        listing_title: listingTitle,
+        listing_description: listingDescription,
         estimated_price: Number.parseFloat(formData.get("estimated_price") as string) || null,
         sale_price: Number.parseFloat(formData.get("sale_price") as string) || null,
         status: formData.get("status"),
@@ -1019,6 +1025,8 @@ export function InventoryForm({ mode = 'create', initialData, onSuccess, onUploa
         product_name_type: typeof itemData.product_name,
         photos_count: itemData.photos.length,
         photos_urls: itemData.photos,
+        listing_title: itemData.listing_title,
+        listing_description_present: typeof itemData.listing_description === 'string' ? (itemData.listing_description as string).length : itemData.listing_description,
         all_fields: Object.keys(itemData),
         mode: mode,
         project_id: activeProject.id
