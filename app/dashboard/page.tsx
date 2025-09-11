@@ -14,6 +14,7 @@ import {
   BarChart3, 
   Users, 
   ArrowRight,
+  Sparkles,
   TrendingUp,
   DollarSign,
   Calendar,
@@ -200,7 +201,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick Actions */}
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-8 mb-12">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 mb-12">
           <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
                  onClick={() => router.push('/inventory/add')}>
             <CardContent className="p-8">
@@ -213,6 +214,25 @@ export default function DashboardPage() {
                   <p className="text-gray-600 mb-4">Añade un nuevo objeto o producto al inventario</p>
                   <div className="flex items-center text-purple-600 font-medium">
                     <span>Crear nuevo item</span>
+                    <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-white/80 backdrop-blur-sm border-0 shadow-lg hover:shadow-xl transition-all duration-300 group cursor-pointer"
+                 onClick={() => router.push('/ai')}>
+            <CardContent className="p-8">
+              <div className="flex items-center space-x-4">
+                <div className="p-4 rounded-2xl bg-brand-gradient group-hover:scale-110 transition-transform duration-300">
+                  <Sparkles className="h-8 w-8 text-white" />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-xl font-semibold text-gray-900 mb-2">AI Studio</h3>
+                  <p className="text-gray-600 mb-4">Genera fotos listas para vender y textos en inglés</p>
+                  <div className="flex items-center text-pink-600 font-medium">
+                    <span>Abrir AI Studio</span>
                     <ArrowRight className="h-4 w-4 ml-2 group-hover:translate-x-1 transition-transform" />
                   </div>
                 </div>
