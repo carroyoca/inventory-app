@@ -17,6 +17,7 @@ interface InventoryStatsProps {
 export function InventoryStats({ items }: InventoryStatsProps) {
   const totalItems = items.length
   const availableItems = items.filter((item) => item.status === "available").length
+  const publishedItems = items.filter((item) => item.status === "published").length
   const soldItems = items.filter((item) => item.status === "sold").length
   const reservedItems = items.filter((item) => item.status === "reserved").length
 
@@ -40,6 +41,12 @@ export function InventoryStats({ items }: InventoryStatsProps) {
       value: availableItems.toString(),
       icon: CheckCircle,
       color: "text-green-600",
+    },
+    {
+      title: "Publicados",
+      value: publishedItems.toString(),
+      icon: CheckCircle,
+      color: "text-indigo-600",
     },
     {
       title: "Vendidos",
@@ -70,12 +77,14 @@ export function InventoryStats({ items }: InventoryStatsProps) {
                 <div className={`p-3 rounded-xl ${
                   stat.title === "Total de ítems" ? "bg-blue-100" :
                   stat.title === "Disponibles" ? "bg-green-100" :
+                  stat.title === "Publicados" ? "bg-indigo-100" :
                   stat.title === "Vendidos" ? "bg-purple-100" :
                   "bg-orange-100"
                 }`}>
                   <Icon className={`h-6 w-6 ${
                     stat.title === "Total de ítems" ? "text-blue-600" :
                     stat.title === "Disponibles" ? "text-green-600" :
+                    stat.title === "Publicados" ? "text-indigo-600" :
                     stat.title === "Vendidos" ? "text-purple-600" :
                     "text-orange-600"
                   }`} />
