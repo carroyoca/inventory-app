@@ -33,6 +33,13 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
   throw lastErr
 }
 
+function withTimeout<T>(p: Promise<T>, ms: number, label = 'operation'): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)
+    p.then((v) => { clearTimeout(t); resolve(v) }).catch((e) => { clearTimeout(t); reject(e) })
+  })
+}
+
 async function callGeminiImageTransform({
   base64,
   mimeType,
@@ -156,15 +163,22 @@ export async function POST(request: NextRequest) {
 
     const photos: string[] = Array.isArray(body.photoUrls) && body.photoUrls.length > 0 ? body.photoUrls : Array.isArray(item.photos) ? item.photos : []
     if (!photos.length) return NextResponse.json({ error: 'This item has no photos' }, { status: 400 })
-    const maxCount = Math.max(1, Math.min(body.maxCount ?? photos.length, photos.length, 6))
+    // Limit default generation to 3 to stay within function timeout reliably
+    const maxCount = Math.min(body.maxCount ?? 3, photos.length, 3)
     const selected = photos.slice(0, maxCount)
 
     // Fetch and generate with retries; limit concurrency by doing sequentially
+    const startTime = Date.now()
+    const timeBudgetMs = 55000 // ensure we return before platform timeout (60s)
     const generated: string[] = []
     for (const url of selected) {
+      if (Date.now() - startTime > timeBudgetMs) {
+        console.warn('Time budget reached, returning partial results')
+        break
+      }
       try {
-        const { base64, mimeType } = await withRetry(() => fetchAsBase64(url))
-        const b64 = await withRetry(() => callGeminiImageTransform({ base64, mimeType, apiKey }))
+        const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(url), 10000, 'image fetch'))
+        const b64 = await withRetry(() => withTimeout(callGeminiImageTransform({ base64, mimeType, apiKey }), 20000, 'image generate'))
         const dataUrl = `data:image/png;base64,${b64}`
         if (!blobConfigured) {
           generated.push(dataUrl)
@@ -173,7 +187,7 @@ export async function POST(request: NextRequest) {
         try {
           const binary = Buffer.from(b64, 'base64')
           const filename = `ai/${user.id}/${Date.now()}-${Math.random().toString(36).slice(2)}.png`
-          const blob = await put(filename, binary, { access: 'public', contentType: 'image/png' })
+          const blob = await withTimeout(put(filename, binary, { access: 'public', contentType: 'image/png' }), 8000, 'blob upload')
           generated.push(blob.url)
         } catch (e) {
           console.error('Blob upload failed, returning data URL fallback:', e)
@@ -186,7 +200,7 @@ export async function POST(request: NextRequest) {
 
     const productIdVal = (item as any).product_id ?? ''
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${productIdVal}; ${body.extraDescription || ''}`.trim()
-    const listing = await withRetry(() => callGeminiListing({ apiKey, description: desc }))
+    const listing = await withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 15000, 'listing generate'))
 
     return NextResponse.json({
       success: true,

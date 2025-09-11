@@ -70,7 +70,13 @@ export default function AIStudioPage() {
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
         body: JSON.stringify({ itemId: selectedItem.id }),
       })
-      const json = await res.json()
+      let json: any
+      try {
+        json = await res.json()
+      } catch {
+        const text = await res.text()
+        throw new Error(text || 'Generation failed (non-JSON response)')
+      }
       if (!res.ok) throw new Error(json.details || json.error || 'Generation failed')
       const gen = json as GenerateResponse
       setResult(gen)
@@ -112,7 +118,13 @@ export default function AIStudioPage() {
           // updateListingFields intentionally omitted; server defaults to true
         }),
       })
-      const json = await res.json()
+      let json: any
+      try {
+        json = await res.json()
+      } catch {
+        const text = await res.text()
+        throw new Error(text || 'Apply failed (non-JSON response)')
+      }
       if (!res.ok) throw new Error(json.details || json.error || 'Apply failed')
       toast({ title: 'Applied', description: 'Images and listing saved to item.' })
     } catch (e) {
