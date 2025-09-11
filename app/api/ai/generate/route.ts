@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
 
     const { data: item, error: itemErr } = await supabase
       .from('inventory_items')
-      .select('id, project_id, product_name, description, photos')
+      .select('id, project_id, product_name, description, photos, product_id')
       .eq('id', body.itemId)
       .single()
     if (itemErr || !item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
@@ -174,7 +174,8 @@ export async function POST(request: NextRequest) {
       }),
     )
 
-    const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${item.product_id || ''}; ${body.extraDescription || ''}`.trim()
+    const productIdVal = (item as any).product_id ?? ''
+    const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${productIdVal}; ${body.extraDescription || ''}`.trim()
     const listing = await callGeminiListing({ apiKey, description: desc })
 
     return NextResponse.json({
