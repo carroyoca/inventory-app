@@ -16,25 +16,43 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
   throw lastErr
 }
 
-async function callGeminiListing({ apiKey, description }: { apiKey: string; description: string }) {
+type ListingOut = { listing_title?: string; listing_description?: string; analysis_text?: string; sources?: { title?: string; url?: string }[] }
+
+async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   const prompt = `You are an expert appraiser and marketplace copywriter. Use Google Search to research artist/work and comps. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on comparable works and signals\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
+    model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
     config: { temperature: 0.6, tools: [{ googleSearch: {} }] },
   })
   const textOut = (resp as any)?.text || ''
   const match = textOut.match(/\{[\s\S]*\}/)
   if (!match) throw new Error('Gemini listing response did not contain JSON')
-  const parsed = JSON.parse(match[0])
+  const parsed = JSON.parse(match[0]) as ListingOut
   const chunks = (resp as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks || []
   const sources = chunks
     .map((c: any) => c?.web)
     .filter((w: any) => w && (w.uri || w.title))
     .map((w: any) => ({ title: w.title || '', url: w.uri || '' }))
   return { ...parsed, sources: parsed.sources?.length ? parsed.sources : sources }
+}
+
+async function callGeminiListingQuick({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = `You are an expert appraiser and marketplace copywriter. No web search. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on provided facts\",\n  \"sources\": []\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: { temperature: 0.5 },
+  })
+  const textOut = (resp as any)?.text || ''
+  const match = textOut.match(/\{[\s\S]*\}/)
+  if (!match) throw new Error('Gemini listing response did not contain JSON')
+  const parsed = JSON.parse(match[0]) as ListingOut
+  return { ...parsed, sources: Array.isArray(parsed.sources) ? parsed.sources : [] }
 }
 
 export async function POST(request: NextRequest) {
@@ -74,8 +92,17 @@ export async function POST(request: NextRequest) {
     if (!membership) return NextResponse.json({ error: 'No access to this project' }, { status: 403 })
 
     const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${(item as any).product_id ?? ''}; ${extraDescription || ''}`.trim()
-    // Allow more time for search-enabled calls but keep under 30s
-    const listing = await withRetry(() => withTimeout(callGeminiListing({ apiKey, description: desc }), 20000, 'listing generate'), 1, 500)
+    const useSearch = body?.useSearch !== false
+    let listing: ListingOut
+    if (useSearch) {
+      try {
+        listing = await withTimeout(callGeminiListingWithSearch({ apiKey, description: desc }), 18000, 'listing generate (search)')
+      } catch (e) {
+        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing generate (quick)')
+      }
+    } else {
+      listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 12000, 'listing generate (quick)')
+    }
     return NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',
