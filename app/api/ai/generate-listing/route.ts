@@ -16,6 +16,33 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
   throw lastErr
 }
 
+function parseJsonLenient<T = any>(raw: string): T {
+  const trim = (s: string) => s.replace(/^```(json)?/i, '').replace(/```\s*$/, '').trim()
+  const tryParse = (s: string) => {
+    try { return { ok: true as const, value: JSON.parse(s) } } catch (e) { return { ok: false as const, err: e as Error } }
+  }
+  // First try raw
+  let attempt = tryParse(raw)
+  if (attempt.ok) return attempt.value
+  // Remove code fences
+  attempt = tryParse(trim(raw))
+  if (attempt.ok) return attempt.value
+  // Extract first JSON object block
+  const match = raw.match(/\{[\s\S]*\}/)
+  if (match) {
+    attempt = tryParse(match[0])
+    if (attempt.ok) return attempt.value
+  }
+  // Escape control characters globally to avoid "Bad control character" errors
+  const escaped = (match ? match[0] : trim(raw))
+    .replace(/\r?\n/g, '\\n')
+    .replace(/\t/g, '\\t')
+    .replace(/[\u0000-\u0019]/g, ' ')
+  attempt = tryParse(escaped)
+  if (attempt.ok) return attempt.value
+  throw new Error(`Failed to parse JSON from model output: ${String((attempt.err as any)?.message || attempt.err)}\nSnippet: ${raw.slice(0, 300)}`)
+}
+
 type ListingOut = { listing_title?: string; listing_description?: string; analysis_text?: string; sources?: { title?: string; url?: string }[] }
 
 async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
@@ -28,7 +55,7 @@ async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: st
     config: { temperature: 0.4, tools: [{ googleSearch: {} }], responseMimeType: 'application/json' },
   })
   const textOut = (resp as any)?.text || ''
-  const parsed = JSON.parse(textOut) as ListingOut
+  const parsed = parseJsonLenient<ListingOut>(textOut)
   const chunks = (resp as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks || []
   const sources = chunks
     .map((c: any) => c?.web)
@@ -47,7 +74,7 @@ async function callGeminiListingQuick({ apiKey, description }: { apiKey: string;
     config: { temperature: 0.5, responseMimeType: 'application/json' },
   })
   const textOut = (resp as any)?.text || ''
-  const parsed = JSON.parse(textOut) as ListingOut
+  const parsed = parseJsonLenient<ListingOut>(textOut)
   return { ...parsed, sources: Array.isArray(parsed.sources) ? parsed.sources : [] }
 }
 
