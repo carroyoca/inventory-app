@@ -21,11 +21,11 @@ type ListingOut = { listing_title?: string; listing_description?: string; analys
 async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `Role: You are an expert appraiser and marketplace copywriter.\nGoal: Produce a professional listing backed by web research.\n\nFacts (from the item):\n${description}\n\nResearch plan (use Google Search tool):\n- Prioritize brand + catalog/model numbers when present (e.g., Lladró 4882).\n- Find issued/retired years, sculptor/designer, official/market names, typical dimensions.\n- Collect 3–5 comparable sold/listed items with site, title, date, condition, price, URL.\n- Prefer eBay sold/completed, LiveAuctioneers, Replacements, auction catalogues.\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject — sculptor/designer (if known)\",\n  \"listing_description\": \"2–3 short paragraphs (max ~220 words). Include maker/line, sculptor/designer (if known), model/catalog number, issue/retire dates, finish/materials, approx dimensions (cm and inches when available), condition cues, authenticity marks. Integrate 1–2 bracketed citations like [1], [2] tied to Sources order.\",\n  \"analysis_text\": \"Concise notes: estimated price range + reasoning citing key comps and condition differences.\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nConstraints: If unknown, write \"Not Available\". Return JSON only.`
+  const prompt = `Role: You are an expert appraiser and marketplace copywriter.\nGoal: Produce a professional listing backed by web research.\n\nFacts (from the item):\n${description}\n\nResearch plan (use Google Search tool):\n- Prioritize brand + catalog/model numbers when present (e.g., Lladró 4882 / Lladro 4882). Include Spanish name variants when relevant.\n- Find issued/retired years, sculptor/designer, official/market names, typical dimensions.\n- Collect 3–5 comparable SOLD or listed items with site, title, date (or year), condition, price, URL.\n- Prefer eBay sold/completed, LiveAuctioneers, Replacements, auction catalogues.\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject — sculptor/designer (if known)\",\n  \"listing_description\": \"2–3 short paragraphs (max ~220 words). Include maker/line, sculptor/designer (if known), model/catalog number, issue/retire dates, finish/materials, approx dimensions (cm and inches when available), condition cues, authenticity marks. Integrate 1–2 bracketed citations like [1], [2] tied to Sources order.\",\n  \"analysis_text\": \"Price Range (USD): $MIN–$MAX. Key Comparables: bullet 2–3 lines with Site + Year/Date + Title + Price + Condition + [n]. Rationale: one short sentence explaining the range based on those comps and the item condition/size.\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nConstraints: If unknown, write \"Not Available\". Use bracketed references [n] aligned to Sources order. Return JSON only.`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
-    config: { temperature: 0.6, tools: [{ googleSearch: {} }], responseMimeType: 'application/json' },
+    config: { temperature: 0.4, tools: [{ googleSearch: {} }], responseMimeType: 'application/json' },
   })
   const textOut = (resp as any)?.text || ''
   const parsed = JSON.parse(textOut) as ListingOut
@@ -40,7 +40,7 @@ async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: st
 async function callGeminiListingQuick({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `Role: Expert appraiser and marketplace copywriter.\nNo web search in this mode — use ONLY the provided facts.\n\nFacts (from the item):\n${description}\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject\",\n  \"listing_description\": \"~150–180 words in 2 paragraphs. Incorporate model/catalog number, year/period if present, materials/finish, approx dimensions (cm and inches if available), condition, and authenticity marks.\",\n  \"analysis_text\": \"Price range and brief reasoning strictly from the provided facts.\",\n  \"sources\": []\n}\nConstraints: If unknown, write \"Not Available\". Return JSON only.`
+  const prompt = `Role: Expert appraiser and marketplace copywriter.\nNo web search in this mode — use ONLY the provided facts.\n\nFacts (from the item):\n${description}\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject\",\n  \"listing_description\": \"~150–180 words in 2 paragraphs. Incorporate model/catalog number, year/period if present, materials/finish, approx dimensions (cm and inches if available), condition, and authenticity marks.\",\n  \"analysis_text\": \"Price Range (USD): $MIN–$MAX. Rationale: one short sentence based on the provided facts (brand/size/condition/subject).\",\n  \"sources\": []\n}\nConstraints: If unknown, write \"Not Available\". Return JSON only.`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
@@ -108,10 +108,10 @@ export async function POST(request: NextRequest) {
     let mode: 'search' | 'quick' = 'search'
     if (useSearch) {
       try {
-        listing = await withTimeout(callGeminiListingWithSearch({ apiKey, description: desc }), 18000, 'listing generate (search)')
+        listing = await withTimeout(callGeminiListingWithSearch({ apiKey, description: desc }), 22000, 'listing generate (search)')
       } catch (e) {
         mode = 'quick'
-        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing generate (quick)')
+        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 7000, 'listing generate (quick)')
       }
     } else {
       mode = 'quick'
