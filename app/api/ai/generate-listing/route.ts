@@ -92,81 +92,39 @@ async function callCompsWithSearch({ apiKey, facts, itemCategory }: { apiKey: st
     ? 'Focus on: sculptor/artist, material composition, casting info, edition size, installation context'
     : 'Focus on: comparable items by type, condition, size, and market pricing'
     
-  const prompt = `Task: Conduct comprehensive market research for this ${itemCategory} item using multi-phase search strategy.
+  const prompt = `Search for ${itemCategory} comparable sales and market data.
 
 ${searchFocus}
 
-PHASE 1: SPECIFIC IDENTIFICATION
-- Search exact product IDs/catalog numbers (highest priority)
-- Include manufacturer variants and international naming
-- Use quotation marks for exact matches
+SEARCH PRIORITY:
+1. "${facts.split(';')[2]?.replace('product_id: ', '') || ''}" exact product ID/catalog number
+2. Manufacturer + model + condition combinations  
+3. Recent sold listings on eBay, LiveAuctioneers, WorthPoint
+4. Collector/dealer pricing guides
 
-PHASE 2: COMPARATIVE MARKET ANALYSIS  
-- Search similar items by manufacturer + type + size/era
-- Include condition-specific terms (mint, excellent, good, fair)
-- Focus on SOLD/COMPLETED listings (not active)
+TARGET: Find 3-5 comparable SOLD items with prices, dates, conditions.
 
-PHASE 3: MARKET VALIDATION
-- Cross-reference pricing across multiple platforms
-- Verify authenticity through expert sources when possible
-- Check recent trends vs historical data
+Item: ${facts}
 
-TRUSTED SOURCES (prioritize):
-- Auction houses: Christie's, Sotheby's, LiveAuctioneers, Heritage Auctions
-- Certified dealers: Replacements Ltd, WorthPoint, specialized dealers
-- Verified marketplaces: eBay sold listings, Etsy (verified sellers)
-
-QUALITY REQUIREMENTS:
-- Minimum 3 comparable items with clear pricing
-- Include date/year of sale for trend analysis  
-- Verify condition matches or note differences
-- Flag any uncertain or estimated values
-
-Item Details: ${facts}
-
-Conduct thorough research and return verified market data:`
+Research efficiently and return market data:`
 
   console.log('🔍 SEARCH PROMPT:', prompt.substring(0, 300) + '...')
 
   const enhancedPrompt = `${prompt}
 
-CRITICAL: Return your response as valid JSON only, following this exact structure:
+Return JSON only:
 {
-  "comps": [
-    {
-      "site": "website name",
-      "title": "item title", 
-      "date": "sale date",
-      "year": 2024,
-      "condition": "condition grade",
-      "price_usd": 150,
-      "url": "source url",
-      "confidence": "high"
-    }
-  ],
-  "meta": {
-    "artist": "sculptor name",
-    "manufacturer": "maker",
-    "series": "collection name",
-    "issue_year": 1985,
-    "retire_year": 2010,
-    "material": "porcelain"
-  },
-  "market_insights": {
-    "price_trend": "stable",
-    "market_activity": "active", 
-    "collector_interest": "high",
-    "authenticity_concerns": false
-  }
+  "comps": [{"site": "eBay", "title": "Lladro 5073 Young Girl", "date": "Oct 2024", "year": 2024, "condition": "excellent", "price_usd": 125, "confidence": "high"}],
+  "meta": {"manufacturer": "Lladro", "series": "Classic", "issue_year": 1982}
 }
 
-Provide 2-6 comparable items with accurate pricing and source information.`
+Find actual sold listings - be accurate.`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [{ text: enhancedPrompt }] },
     config: {
-      temperature: 0.1,
+      temperature: 0.0,
       tools: [{ googleSearch: {} }]
     },
   })
@@ -682,7 +640,7 @@ export async function POST(request: NextRequest) {
       console.log('🔍 Item facts:', desc.substring(0, 200) + '...')
       
       try {
-        const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 18000, 'listing comps (search)')
+        const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 30000, 'listing comps (search)')
         
         console.log('🔍 SEARCH RESULTS:', {
           compsFound: Array.isArray(comps) ? comps.length : 0,
