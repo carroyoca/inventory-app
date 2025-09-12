@@ -117,25 +117,27 @@ Create varied pricing based on condition differences and market activity.`
 
 async function callCompsWithSearch({ apiKey, facts, itemCategory }: { apiKey: string; facts: string; itemCategory: string }): Promise<{ comps: Comp[]; meta: { sculptor?: string; issue_year?: number; retire_year?: number } }>
 {
-  console.log('🔍 Attempting web search for market data...')
+  console.log('🔍 MANDATORY web search for market data - no fallbacks allowed')
   
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey })
+  
+  // Extract key search terms
+  const productId = facts.split(';')[2]?.replace('product_id: ', '')?.trim() || ''
+  const productName = facts.split(';')[0]?.replace('product_name: ', '')?.trim() || ''
+  
+  // Ultra-focused, fast search prompt
+  const prompt = `URGENT: Find real sold listings for "${productName} ${productId}".
+
+Search eBay sold listings, recent auctions. Find 2-4 actual sales with prices.
+
+Return JSON immediately:
+{"comps": [{"site": "eBay", "title": "real listing title", "price_usd": 50, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Lladro"}}`
+
+  console.log('🔍 FOCUSED SEARCH:', `"${productName} ${productId}"`)
+  console.log('🔍 Search timeout: Will wait up to 45 seconds for results')
+
   try {
-    const { GoogleGenAI } = await import('@google/genai')
-    const ai = new GoogleGenAI({ apiKey })
-    
-    // Simplified, focused search
-    const productId = facts.split(';')[2]?.replace('product_id: ', '')?.trim() || ''
-    const productName = facts.split(';')[0]?.replace('product_name: ', '')?.trim() || ''
-    
-    const prompt = `Search for multiple sold listings of "${productName} ${productId}" on eBay, LiveAuctioneers, WorthPoint, Heritage Auctions.
-
-Find 3-5 different sold items with varying conditions and prices to show market range.
-
-Return JSON:
-{"comps": [{"site": "eBay", "title": "exact listing found", "price_usd": 55, "condition": "excellent", "confidence": "high"}, {"site": "LiveAuctioneers", "title": "another listing", "price_usd": 42, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Lladro", "series": "collection name", "issue_year": 1982}}`
-
-    console.log('🔍 Quick search for:', `"${productName} ${productId}"`)
-
     const resp = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: [{ text: prompt }] },
@@ -145,21 +147,24 @@ Return JSON:
       },
     })
     
+    console.log('🔍 RAW SEARCH RESPONSE received')
     const textOut = (resp as any)?.text || '{}'
+    console.log('🔍 Response text length:', textOut.length)
+    
     const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(textOut)
+    console.log('🔍 Parsed comps count:', Array.isArray(parsed.comps) ? parsed.comps.length : 0)
     
-    console.log('🔍 Web search results:', Array.isArray(parsed.comps) ? parsed.comps.length : 0, 'comps found')
-    
-    if (Array.isArray(parsed.comps) && parsed.comps.length > 0) {
-      return { comps: parsed.comps, meta: parsed.meta || {} }
+    if (!Array.isArray(parsed.comps) || parsed.comps.length === 0) {
+      throw new Error('Web search returned no comparable data')
     }
+    
+    console.log('✅ Web search SUCCESS:', parsed.comps.length, 'comparables found')
+    return { comps: parsed.comps, meta: parsed.meta || {} }
+    
   } catch (error) {
-    console.log('🔍 Web search failed, using knowledge fallback')
+    console.log('❌ CRITICAL: Web search failed completely:', error)
+    throw new Error(`Web search failed: ${error}`)
   }
-  
-  // Fallback to knowledge-based generation
-  console.log('🔍 Using knowledge-based comparable generation')
-  return await callFastCompsGeneration({ apiKey, facts, itemCategory })
 }
 
 async function composeListing({ apiKey, facts, comps, meta, itemCategory }: { apiKey: string; facts: string; comps: Comp[]; meta: any; itemCategory: string }): Promise<ListingOut> {
@@ -623,55 +628,36 @@ export async function POST(request: NextRequest) {
     const useSearch = body?.useSearch !== false
     let listing: ListingOut
     let mode: 'search+compose' | 'quick' = 'search+compose'
-    if (useSearch) {
-      console.log('🔍 SEARCH MODE: Attempting to use web search for listing generation')
-      console.log('🔍 Item category:', itemCategory)
-      console.log('🔍 Item facts:', desc.substring(0, 200) + '...')
-      
-      try {
-        const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 15000, 'listing comps (search)')
-        
-        console.log('🔍 SEARCH RESULTS:', {
-          compsFound: Array.isArray(comps) ? comps.length : 0,
-          compsData: comps,
-          metaData: meta
-        })
-        
-        if (Array.isArray(comps) && comps.length > 0) {
-          console.log('✅ Using search results for listing composition')
-          listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 20000, 'listing compose')
-          const sources = comps
-            .filter((c) => c && (c.url || c.title || c.site))
-            .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
-          listing.sources = Array.isArray(sources) ? sources : []
-        } else {
-          console.log('⚠️ No search results found, falling back to quick mode')
-          mode = 'quick'
-          listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 8000, 'listing generate (quick)')
-        }
-      } catch (e) {
-        console.log('❌ SEARCH ERROR:', e)
-        console.log('⚠️ Falling back to quick mode due to search error')
-        mode = 'quick'
-        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 8000, 'listing generate (quick)')
-      }
-    } else {
-      console.log('🔍 QUICK MODE: Using offline generation (no search)')
-      mode = 'quick'
-      listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 12000, 'listing generate (quick)')
+    console.log('🔍 SEARCH MODE: Web search is REQUIRED - no fallback modes')
+    console.log('🔍 Item category:', itemCategory)
+    console.log('🔍 Item facts:', desc.substring(0, 200) + '...')
+    
+    // SEARCH IS MANDATORY - NO FALLBACK MODES
+    const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 45000, 'listing comps (search)')
+    
+    console.log('🔍 SEARCH RESULTS:', {
+      compsFound: Array.isArray(comps) ? comps.length : 0,
+      compsData: comps,
+      metaData: meta
+    })
+    
+    if (!Array.isArray(comps) || comps.length === 0) {
+      throw new Error('Search failed to find any comparable data - cannot generate listing without market research')
     }
+    
+    console.log('✅ Using search results for listing composition')
+    listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 25000, 'listing compose')
+    const sources = comps
+      .filter((c) => c && (c.url || c.title || c.site))
+      .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
+    listing.sources = Array.isArray(sources) ? sources : []
 
-    // Validate listing fields; if missing/too short and we were in search mode, try quick fallback once
+    // Validate that search+compose produced complete results
     const isEmpty = (s?: string) => !s || !String(s).trim()
     const tooShort = (s?: string, n = 60) => !s || String(s).trim().length < n
-    if (mode === 'search+compose' && (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description))) {
-      try {
-        const rescue = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 8000, 'listing rescue (quick)')
-        // Prefer rescue fields if they are more complete
-        if (!isEmpty(rescue.listing_title)) listing.listing_title = rescue.listing_title
-        if (!tooShort(rescue.listing_description)) listing.listing_description = rescue.listing_description
-        if (isEmpty(listing.analysis_text) && !isEmpty(rescue.analysis_text)) listing.analysis_text = rescue.analysis_text
-      } catch {}
+    
+    if (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description) || isEmpty(listing?.analysis_text)) {
+      throw new Error('Search+compose failed to generate complete listing - missing title, description, or analysis')
     }
     // Final safety fallback if model produced empty fields
     const fallbackTitle = item.product_name || 'Listing'
