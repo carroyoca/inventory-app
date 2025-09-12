@@ -127,7 +127,7 @@ Item Details: ${facts}
 Conduct thorough research and return verified market data:`
 
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-002',
+    model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       temperature: 0.1,
@@ -240,7 +240,7 @@ Comparable Sales: ${JSON.stringify(comps, null, 2)}
 Compose compelling, accurate marketplace content:`
 
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-002',
+    model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
       temperature: 0.2,
@@ -332,7 +332,7 @@ Item Details: ${description}
 Research thoroughly and create accurate marketplace content with proper source attribution.`
 
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-002',
+    model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: { 
       temperature: 0.15, 
@@ -416,7 +416,7 @@ Item Details: ${description}
 Create accurate marketplace content based solely on available information:`
 
   const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash-002',
+    model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: { 
       temperature: 0.3,
