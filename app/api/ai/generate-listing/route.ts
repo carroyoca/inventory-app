@@ -84,24 +84,12 @@ async function callFastCompsGeneration({ apiKey, facts, itemCategory }: { apiKey
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   
-  const prompt = `Generate 4-5 realistic market comparables for this ${itemCategory} based on your knowledge.
+  const prompt = `Generate realistic ${itemCategory} market comparables.
 
 Item: ${facts}
 
-Use your training data knowledge of ${itemCategory === 'collectible' ? 'collectible markets like Lladró, Hummel, etc.' : 'art markets'} to create realistic comparable sales with varied pricing.
-
-Return JSON only:
-{
-  "comps": [
-    {"site": "eBay", "title": "Similar item title", "date": "Nov 2024", "year": 2024, "condition": "excellent", "price_usd": 65, "confidence": "medium"},
-    {"site": "LiveAuctioneers", "title": "Another similar", "date": "Oct 2024", "year": 2024, "condition": "very good", "price_usd": 45, "confidence": "medium"},
-    {"site": "WorthPoint", "title": "Third comparable", "date": "Sep 2024", "year": 2024, "condition": "mint", "price_usd": 85, "confidence": "medium"},
-    {"site": "Heritage Auctions", "title": "Fourth item", "date": "Aug 2024", "year": 2024, "condition": "good", "price_usd": 38, "confidence": "medium"}
-  ],
-  "meta": {"manufacturer": "Brand", "series": "Series", "issue_year": 1980, "retire_year": 1995}
-}
-
-Create varied pricing based on condition differences and market activity.`
+JSON only:
+{"comps": [{"site": "eBay", "title": "Lladro Girl Picking Flowers", "price_usd": 55, "condition": "excellent", "confidence": "medium"}, {"site": "WorthPoint", "title": "Similar Lladro Figurine", "price_usd": 42, "condition": "good", "confidence": "medium"}], "meta": {"manufacturer": "Lladro"}}`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -182,7 +170,7 @@ CRITICAL: Return ONLY valid JSON. No explanations.
     if (!Array.isArray(parsed.comps) || parsed.comps.length === 0) {
       console.log('⚠️ Web search found no results, generating knowledge-based comparables')
       // Use knowledge-based generation as backup when search finds nothing
-      return await callFastCompsGeneration({ apiKey, facts, itemCategory })
+      return await withTimeout(callFastCompsGeneration({ apiKey, facts, itemCategory }), 10000, 'knowledge-based comps generation')
     }
     
     console.log('✅ Web search SUCCESS:', parsed.comps.length, 'comparables found')
