@@ -157,6 +157,20 @@ export async function POST(request: NextRequest) {
         if (isEmpty(listing.analysis_text) && !isEmpty(rescue.analysis_text)) listing.analysis_text = rescue.analysis_text
       } catch {}
     }
+    // Final safety fallback if model produced empty fields
+    const fallbackTitle = item.product_name || 'Listing'
+    const fallbackDescBase = [
+      item.product_name && `Item: ${item.product_name}`,
+      (item as any).product_id && `Model/ID: ${(item as any).product_id}`,
+      item.description && `Description: ${item.description}`,
+    ].filter(Boolean).join('\n')
+    if (!listing?.listing_title || !String(listing.listing_title).trim()) {
+      listing.listing_title = fallbackTitle
+    }
+    if (!listing?.listing_description || !String(listing.listing_description).trim()) {
+      listing.listing_description = fallbackDescBase || 'Not Available'
+    }
+
     const res = NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',

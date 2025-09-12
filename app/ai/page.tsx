@@ -129,16 +129,25 @@ export default function AIStudioPage() {
       try { j2 = await r2.json() } catch { j2 = { error: await r2.text() } }
       if (!r2.ok) throw new Error(j2.details || j2.error || 'Listing generation failed')
 
+      const title = j2.listing_title || ''
+      const body = j2.listing_description || ''
+      const analysis = j2.analysis_text || ''
+
+      // If both fields are empty, surface a clear error instead of a success toast
+      if (!title.trim() && !body.trim() && !analysis.trim()) {
+        throw new Error('Listing generation returned empty content. Please try again.')
+      }
+
       setResult((prev) => ({
         success: true,
         imageUrls: prev?.imageUrls || [],
-        listing_title: j2.listing_title || '',
-        listing_description: j2.listing_description || '',
-        analysis_text: j2.analysis_text || '',
+        listing_title: title,
+        listing_description: body,
+        analysis_text: analysis,
         sources: j2.sources || [],
       }))
-      setTitleDraft(j2.listing_title || '')
-      setDescDraft(j2.listing_description || '')
+      setTitleDraft(title)
+      setDescDraft(body)
       toast({ title: 'Listing generated', description: 'Texts are ready.' })
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
