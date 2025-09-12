@@ -17,7 +17,12 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
 }
 
 function parseJsonLenient<T = any>(raw: string): T {
-  const trim = (s: string) => s.replace(/^```(json)?/i, '').replace(/```\s*$/, '').trim()
+  const trim = (s: string) => s
+    .replace(/^\uFEFF/, '') // BOM
+    .replace(/[\u200B\u200C\u200D]/g, '') // zero-width spaces
+    .replace(/^```(json)?/i, '')
+    .replace(/```\s*$/, '')
+    .trim()
   const tryParse = (s: string) => {
     try { return { ok: true as const, value: JSON.parse(s) } } catch (e) { return { ok: false as const, err: e as Error } }
   }
@@ -38,7 +43,9 @@ function parseJsonLenient<T = any>(raw: string): T {
   // Extract first JSON object block
   const match = raw.match(/\{[\s\S]*\}/)
   if (match) {
-    attempt = tryParse(match[0])
+    // sanitize trailing commas
+    const cleaned = match[0].replace(/,\s*([}\]])/g, '$1')
+    attempt = tryParse(cleaned)
     if (attempt.ok) return attempt.value
   }
   // Escape control characters globally to avoid "Bad control character" errors
@@ -46,11 +53,24 @@ function parseJsonLenient<T = any>(raw: string): T {
     .replace(/\r?\n/g, '\\n')
     .replace(/\t/g, '\\t')
     .replace(/[\u0000-\u0019]/g, ' ')
+    .replace(/,\s*([}\]])/g, '$1')
   attempt = tryParse(escaped)
   if (attempt.ok) {
     const v = attempt.value
     if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v[0]
     return v
+  }
+  // Last resort: manual field extraction to avoid total failure
+  const title = /"listing_title"\s*:\s*"([\s\S]*?)"\s*(,|})/.exec(raw)?.[1]
+  const desc = /"listing_description"\s*:\s*"([\s\S]*?)"\s*(,|})/.exec(raw)?.[1]
+  const analysis = /"analysis_text"\s*:\s*"([\s\S]*?)"\s*(,|})/.exec(raw)?.[1]
+  if (title || desc || analysis) {
+    return {
+      listing_title: title ? title.replace(/\r?\n/g, ' ') : '',
+      listing_description: desc ? desc.replace(/\r?\n/g, '\n') : '',
+      analysis_text: analysis ? analysis.replace(/\r?\n/g, '\n') : '',
+      sources: [],
+    } as unknown as T
   }
   throw new Error(`Failed to parse JSON from model output: ${String((attempt.err as any)?.message || attempt.err)}\nSnippet: ${raw.slice(0, 300)}`)
 }
