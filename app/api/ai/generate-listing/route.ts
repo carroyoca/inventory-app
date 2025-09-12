@@ -190,30 +190,14 @@ async function composeListing({ apiKey, facts, comps, meta, itemCategory }: { ap
 - Include relevant historical or technical context
 - Use appropriate market terminology`
 
-  const prompt = `Compose a professional marketplace listing based on research data.
+  const prompt = `Write marketplace listing. ${categoryGuidance}
 
-${categoryGuidance}
+Facts: ${facts}
+Comps: ${JSON.stringify(comps)}
+Meta: ${JSON.stringify(meta)}
 
-WRITING REQUIREMENTS:
-- Title: 60-80 characters, SEO optimized, include key identifiers
-- Description: 150-250 words, professional but engaging tone
-- Analysis: Pricing rationale with specific comparable references [1], [2], etc.
-- Use bracketed citations [n] that correspond to the comp array order
-- Include uncertainty indicators when data is limited
-- Avoid unverifiable claims about rarity or investment value
-
-Item Facts: ${facts}
-Metadata: ${JSON.stringify(meta, null, 2)}
-Comparable Sales: ${JSON.stringify(comps, null, 2)}
-
-Compose compelling, accurate marketplace content:
-
-CRITICAL: Return only valid JSON in this format:
-{
-  "listing_title": "SEO-friendly title here",
-  "listing_description": "Professional marketplace description with citations [1], [2]",
-  "analysis_text": "Price analysis: $MIN-$MAX range. Comparables: [1] Site - $price, [2] Site - $price. Rationale: explanation."
-}`
+JSON only:
+{"listing_title": "Brand Model# Name - Category", "listing_description": "Brief description with key details, condition, dimensions. Reference comps [1].", "analysis_text": "Price range $X-Y based on [1] ${comps[0]?.site} $${comps[0]?.price_usd}."}`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -661,7 +645,7 @@ export async function POST(request: NextRequest) {
         
         if (Array.isArray(comps) && comps.length > 0) {
           console.log('✅ Using search results for listing composition')
-          listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 7000, 'listing compose')
+          listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 20000, 'listing compose')
           const sources = comps
             .filter((c) => c && (c.url || c.title || c.site))
             .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
