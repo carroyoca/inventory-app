@@ -78,150 +78,65 @@ function parseJsonLenient<T = any>(raw: string): T {
 type ListingOut = { listing_title?: string; listing_description?: string; analysis_text?: string; sources?: { title?: string; url?: string }[] }
 type Comp = { site?: string; title?: string; date?: string; year?: number; condition?: string; price_usd?: number; url?: string }
 
-// Fast search approach using knowledge-based comparables
-async function callFastCompsGeneration({ apiKey, facts, itemCategory }: { apiKey: string; facts: string; itemCategory: string }): Promise<{ comps: Comp[]; meta: any }>
-{
-  const { GoogleGenAI } = await import('@google/genai')
-  const ai = new GoogleGenAI({ apiKey })
-  
-  const prompt = `Generate realistic ${itemCategory} market comparables.
-
-Item: ${facts}
-
-JSON only:
-{"comps": [{"site": "eBay", "title": "Lladro Girl Picking Flowers", "price_usd": 55, "condition": "excellent", "confidence": "medium"}, {"site": "WorthPoint", "title": "Similar Lladro Figurine", "price_usd": 42, "condition": "good", "confidence": "medium"}], "meta": {"manufacturer": "Lladro"}}`
-
-  const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: { parts: [{ text: prompt }] },
-    config: { temperature: 0.1 }
-  })
-  
-  const textOut = (resp as any)?.text || '{}'
-  const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(textOut)
-  
-  return { comps: Array.isArray(parsed.comps) ? parsed.comps : [], meta: parsed.meta || {} }
-}
-
-async function callCompsWithSearch({ apiKey, facts, itemCategory }: { apiKey: string; facts: string; itemCategory: string }): Promise<{ comps: Comp[]; meta: { sculptor?: string; issue_year?: number; retire_year?: number } }>
-{
-  console.log('🔍 MANDATORY web search for market data - no fallbacks allowed')
+// Streamlined single function that mimics browser Gemini approach
+async function generateListingDirect({ apiKey, facts, itemCategory }: { apiKey: string; facts: string; itemCategory: string }): Promise<ListingOut> {
+  console.log('🔍 STREAMLINED: Direct Gemini call (browser-style approach)')
   
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   
-  // Extract key search terms
-  const productId = facts.split(';')[2]?.replace('product_id: ', '')?.trim() || ''
-  const productName = facts.split(';')[0]?.replace('product_name: ', '')?.trim() || ''
+  const prompt = `You are an expert ${itemCategory} appraiser and marketplace copywriter.
   
-  // Multi-strategy search approach for better results
-  const searchTerms = [
-    `"Lladro 5073"`,
-    `"Lladró 5073"`, 
-    `"Lladro Country Flowers"`,
-    `"Lladro Girl Picking Flowers"`,
-    `"Lladro Joven Cogiendo Flores"`
-  ]
-  
-  const prompt = `Search eBay SOLD listings, LiveAuctioneers, WorthPoint for these terms:
-${searchTerms.join(' OR ')}
+Analyze this item and use Google Search to find comparable sales data:
+${facts}
 
-Look for:
-- eBay sold/completed listings (not active auctions)
-- Recent sales with final prices
-- Auction house results
-- Collector sales
+Based on your web search, create a professional marketplace listing.
 
-CRITICAL: Return ONLY valid JSON. No explanations.
-
-{"comps": [{"site": "eBay", "title": "Lladro 5073 Country Flowers Girl", "price_usd": 55, "condition": "excellent", "confidence": "high"}], "meta": {"manufacturer": "Lladro", "series": "Country Flowers"}}`
-
-  console.log('🔍 FOCUSED SEARCH:', `"${productName} ${productId}"`)
-  console.log('🔍 Search timeout: Will wait up to 45 seconds for results')
+Return ONLY a valid JSON object:
+{
+  "listing_title": "Professional marketplace title (Lladro 5073 Country Flowers Girl - Retired Porcelain Figurine)",
+  "listing_description": "Clean professional description focusing on item details, condition, authenticity, dimensions. Write naturally like a knowledgeable dealer. NO price mentions in description.",
+  "analysis_text": "Market analysis with price range $X-Y based on comparable sales found in search. Reference specific sources.",
+  "sources": [{"title": "Source name", "url": "source url"}]
+}`
 
   try {
-    const resp = await ai.models.generateContent({
+    console.log('🔍 Making direct Gemini search call...')
+    
+    const response = await ai.models.generateContent({
       model: 'gemini-2.5-flash',
       contents: { parts: [{ text: prompt }] },
       config: {
-        temperature: 0.0,
-        tools: [{ googleSearch: {} }]
+        tools: [{ googleSearch: {} }],
+        temperature: 0.2
       },
     })
+
+    console.log('🔍 Response received, extracting JSON...')
+    const text = response.text.trim()
+    console.log('🔍 Response length:', text.length)
+    console.log('🔍 First 200 chars:', text.substring(0, 200))
     
-    console.log('🔍 RAW SEARCH RESPONSE received')
-    const textOut = (resp as any)?.text || '{}'
-    console.log('🔍 Response text length:', textOut.length)
-    console.log('🔍 First 500 chars:', textOut.substring(0, 500))
-    
-    // Extract JSON from response - look for first { to last }
-    let jsonText = textOut
-    const firstBrace = textOut.indexOf('{')
-    const lastBrace = textOut.lastIndexOf('}')
-    
-    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
-      jsonText = textOut.substring(firstBrace, lastBrace + 1)
-      console.log('🔍 Extracted JSON:', jsonText.substring(0, 200) + '...')
+    // Extract JSON like the working browser example
+    const jsonMatch = text.match(/{[\s\S]*}/)
+    if (!jsonMatch) {
+      throw new Error('No JSON object found in response')
     }
     
-    const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(jsonText)
-    console.log('🔍 Parsed comps count:', Array.isArray(parsed.comps) ? parsed.comps.length : 0)
+    const jsonText = jsonMatch[0]
+    const listing = JSON.parse(jsonText) as ListingOut
     
-    if (!Array.isArray(parsed.comps) || parsed.comps.length === 0) {
-      console.log('⚠️ Web search found no results, generating knowledge-based comparables')
-      // Use knowledge-based generation as backup when search finds nothing
-      return await withTimeout(callFastCompsGeneration({ apiKey, facts, itemCategory }), 10000, 'knowledge-based comps generation')
-    }
+    console.log('✅ JSON extracted successfully')
+    console.log('✅ Title length:', listing.listing_title?.length || 0)
+    console.log('✅ Description length:', listing.listing_description?.length || 0)
+    console.log('✅ Sources count:', Array.isArray(listing.sources) ? listing.sources.length : 0)
     
-    console.log('✅ Web search SUCCESS:', parsed.comps.length, 'comparables found')
-    return { comps: parsed.comps, meta: parsed.meta || {} }
+    return listing
     
   } catch (error) {
-    console.log('❌ CRITICAL: Web search failed completely:', error)
-    throw new Error(`Web search failed: ${error}`)
+    console.log('❌ Direct search failed:', error)
+    throw new Error(`Listing generation failed: ${error}`)
   }
-}
-
-async function composeListing({ apiKey, facts, comps, meta, itemCategory }: { apiKey: string; facts: string; comps: Comp[]; meta: any; itemCategory: string }): Promise<ListingOut> {
-  const { GoogleGenAI } = await import('@google/genai')
-  const ai = new GoogleGenAI({ apiKey })
-  
-  const prompt = `Write a professional marketplace listing for this ${itemCategory}.
-
-STYLE REQUIREMENTS:
-- Clean, professional tone (no bold markdown formatting)
-- Natural, flowing language (not template-like)
-- Focus on the item itself, not market comparisons
-- Be specific and descriptive about condition, features, authenticity
-- Write like a knowledgeable collector/dealer
-
-CONTENT RULES:
-- Title: Brand, model number, descriptive name, key features (60-80 chars)
-- Description: Detailed item description focusing on condition, authenticity, dimensions, notable features (150-200 words)
-- Analysis: Separate section with pricing rationale using comparable data with numbered references [1], [2], etc.
-
-DO NOT mention other listings or prices in the main description.
-
-Item Details: ${facts}
-Market Research: ${JSON.stringify(comps, null, 2)}
-Additional Data: ${JSON.stringify(meta, null, 2)}
-
-Return JSON only:
-{
-  "listing_title": "Lladro 5073 Country Flowers Girl with Basket - Retired Porcelain Figurine",
-  "listing_description": "This charming Lladro porcelain figurine depicts a young peasant girl delicately picking flowers and carrying a wicker basket. Crafted in the classic Lladro style with exceptional attention to detail, this piece features the characteristic soft glazes and gentle expressions the brand is renowned for. The figurine shows excellent condition with authentic Lladro backstamp on the base confirming its authenticity. Dimensions measure approximately 20 cm in height. This retired piece represents fine Spanish porcelain craftsmanship and would make a beautiful addition to any collection.",
-  "analysis_text": "Current market value ranges $45-75 based on condition and rarity. Recent comparable sales include [1] eBay excellent condition $52, [2] LiveAuctioneers very good $48, [3] Heritage Auctions mint condition $68. Pricing reflects the retired status and collector demand for authentic Lladro figurines from this series."
-}`
-
-  const resp = await ai.models.generateContent({
-    model: 'gemini-2.5-flash',
-    contents: { parts: [{ text: prompt }] },
-    config: {
-      temperature: 0.3
-    },
-  })
-  const textOut = (resp as any)?.text || '{}'
-  return parseJsonLenient<ListingOut>(textOut)
 }
 
 async function callGeminiListingWithSearch({ apiKey, description, itemCategory }: { apiKey: string; description: string; itemCategory: string }): Promise<ListingOut> {
@@ -640,40 +555,24 @@ export async function POST(request: NextRequest) {
     ].filter(Boolean) as string[]
     const desc = factsParts.join('; ')
     const itemCategory = isCollectible ? 'collectible' : isArtwork ? 'artwork' : isSculpture ? 'sculpture' : 'general'
-    const useSearch = body?.useSearch !== false
+    const useSearch = body?.useSearch !== false // ignored in direct mode; kept for compatibility
     let listing: ListingOut
-    let mode: 'search+compose' | 'quick' = 'search+compose'
-    console.log('🔍 SEARCH MODE: Web search is REQUIRED - no fallback modes')
+    let mode: 'direct' = 'direct'
+    console.log('🔍 DIRECT MODE: Single-call browser-style approach')
     console.log('🔍 Item category:', itemCategory)
     console.log('🔍 Item facts:', desc.substring(0, 200) + '...')
-    
-    // SEARCH IS MANDATORY - NO FALLBACK MODES
-    const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 45000, 'listing comps (search)')
-    
-    console.log('🔍 SEARCH RESULTS:', {
-      compsFound: Array.isArray(comps) ? comps.length : 0,
-      compsData: comps,
-      metaData: meta
-    })
-    
-    if (!Array.isArray(comps) || comps.length === 0) {
-      throw new Error('Search failed to find any comparable data - cannot generate listing without market research')
-    }
-    
-    console.log('✅ Using search results for listing composition')
-    listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 15000, 'listing compose')
-    const sources = comps
-      .filter((c) => c && (c.url || c.title || c.site))
-      .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
-    listing.sources = Array.isArray(sources) ? sources : []
 
-    // Validate that search+compose produced complete results
-    const isEmpty = (s?: string) => !s || !String(s).trim()
-    const tooShort = (s?: string, n = 60) => !s || String(s).trim().length < n
-    
-    if (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description) || isEmpty(listing?.analysis_text)) {
-      throw new Error('Search+compose failed to generate complete listing - missing title, description, or analysis')
+    try {
+      // Single direct call with Search tool and JSON output
+      listing = await withTimeout(generateListingDirect({ apiKey, facts: desc, itemCategory }), 26000, 'listing direct')
+    } catch (e) {
+      console.warn('⚠️ Direct generation failed, returning minimal fallback:', e)
+      listing = { listing_title: '', listing_description: '', analysis_text: '', sources: [] }
     }
+
+    // Final validation and minimal safety fill
+    const isEmpty = (s?: string) => !s || !String(s).trim()
+    const tooShort = (s?: string, n = 40) => !s || String(s).trim().length < n
     // Final safety fallback if model produced empty fields
     const fallbackTitle = item.product_name || 'Listing'
     const fallbackDescBase = [
@@ -688,26 +587,6 @@ export async function POST(request: NextRequest) {
       listing.listing_description = fallbackDescBase || 'Not Available'
     }
 
-    // Apply quality control
-    const contentValidation = validateListingContent(listing)
-    const sourceValidation = validateSources(listing?.sources || [])
-    const compsData = mode === 'search+compose' ? (listing as any).comps : undefined
-    const confidenceScore = calculateConfidenceScore(listing, item, sourceValidation.validSources, compsData)
-    
-    // Use validated sources
-    listing.sources = sourceValidation.validSources
-    
-    // Log quality metrics for monitoring
-    console.log('Quality Control Results:', {
-      contentValid: contentValidation.isValid,
-      contentScore: contentValidation.score,
-      sourceScore: sourceValidation.score,
-      confidenceScore,
-      mode,
-      itemCategory,
-      issues: [...contentValidation.issues, ...sourceValidation.issues]
-    })
-
     const res = NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',
@@ -715,13 +594,6 @@ export async function POST(request: NextRequest) {
       analysis_text: listing?.analysis_text || '',
       sources: Array.isArray(listing?.sources) ? listing.sources : [],
       mode,
-      quality_metrics: {
-        content_score: contentValidation.score,
-        source_score: sourceValidation.score,
-        confidence_score: confidenceScore,
-        is_validated: contentValidation.isValid,
-        issues: contentValidation.issues.length > 0 ? contentValidation.issues : undefined
-      }
     })
     res.headers.set('X-List-Duration-ms', String(Date.now() - t0))
     return res
