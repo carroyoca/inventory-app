@@ -144,6 +144,19 @@ export async function POST(request: NextRequest) {
       mode = 'quick'
       listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 12000, 'listing generate (quick)')
     }
+
+    // Validate listing fields; if missing/too short and we were in search mode, try quick fallback once
+    const isEmpty = (s?: string) => !s || !String(s).trim()
+    const tooShort = (s?: string, n = 60) => !s || String(s).trim().length < n
+    if (mode === 'search' && (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description))) {
+      try {
+        const rescue = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing rescue (quick)')
+        // Prefer rescue fields if they are more complete
+        if (!isEmpty(rescue.listing_title)) listing.listing_title = rescue.listing_title
+        if (!tooShort(rescue.listing_description)) listing.listing_description = rescue.listing_description
+        if (isEmpty(listing.analysis_text) && !isEmpty(rescue.analysis_text)) listing.analysis_text = rescue.analysis_text
+      } catch {}
+    }
     const res = NextResponse.json({
       success: true,
       listing_title: listing?.listing_title || '',
