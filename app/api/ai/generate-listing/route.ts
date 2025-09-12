@@ -84,22 +84,24 @@ async function callFastCompsGeneration({ apiKey, facts, itemCategory }: { apiKey
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   
-  const prompt = `Generate realistic market comparables for this ${itemCategory} based on your knowledge.
+  const prompt = `Generate 4-5 realistic market comparables for this ${itemCategory} based on your knowledge.
 
 Item: ${facts}
 
-Use your training data knowledge of ${itemCategory === 'collectible' ? 'collectible markets like Lladró, Hummel, etc.' : 'art markets'} to create realistic comparable sales.
+Use your training data knowledge of ${itemCategory === 'collectible' ? 'collectible markets like Lladró, Hummel, etc.' : 'art markets'} to create realistic comparable sales with varied pricing.
 
 Return JSON only:
 {
   "comps": [
-    {"site": "eBay", "title": "Similar item title", "date": "Recent date", "year": 2024, "condition": "condition", "price_usd": 120, "confidence": "medium"},
-    {"site": "LiveAuctioneers", "title": "Another similar", "date": "Oct 2024", "year": 2024, "condition": "excellent", "price_usd": 150, "confidence": "medium"}
+    {"site": "eBay", "title": "Similar item title", "date": "Nov 2024", "year": 2024, "condition": "excellent", "price_usd": 65, "confidence": "medium"},
+    {"site": "LiveAuctioneers", "title": "Another similar", "date": "Oct 2024", "year": 2024, "condition": "very good", "price_usd": 45, "confidence": "medium"},
+    {"site": "WorthPoint", "title": "Third comparable", "date": "Sep 2024", "year": 2024, "condition": "mint", "price_usd": 85, "confidence": "medium"},
+    {"site": "Heritage Auctions", "title": "Fourth item", "date": "Aug 2024", "year": 2024, "condition": "good", "price_usd": 38, "confidence": "medium"}
   ],
-  "meta": {"manufacturer": "Brand", "series": "Series", "issue_year": 1980}
+  "meta": {"manufacturer": "Brand", "series": "Series", "issue_year": 1980, "retire_year": 1995}
 }
 
-Base prices on typical market ranges for this type and brand.`
+Create varied pricing based on condition differences and market activity.`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
@@ -125,10 +127,12 @@ async function callCompsWithSearch({ apiKey, facts, itemCategory }: { apiKey: st
     const productId = facts.split(';')[2]?.replace('product_id: ', '')?.trim() || ''
     const productName = facts.split(';')[0]?.replace('product_name: ', '')?.trim() || ''
     
-    const prompt = `Search web for: "${productName} ${productId}" sold prices recent eBay LiveAuctioneers.
+    const prompt = `Search for multiple sold listings of "${productName} ${productId}" on eBay, LiveAuctioneers, WorthPoint, Heritage Auctions.
+
+Find 3-5 different sold items with varying conditions and prices to show market range.
 
 Return JSON:
-{"comps": [{"site": "eBay", "title": "found title", "price_usd": 100, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Brand"}}`
+{"comps": [{"site": "eBay", "title": "exact listing found", "price_usd": 55, "condition": "excellent", "confidence": "high"}, {"site": "LiveAuctioneers", "title": "another listing", "price_usd": 42, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Lladro", "series": "collection name", "issue_year": 1982}}`
 
     console.log('🔍 Quick search for:', `"${productName} ${productId}"`)
 
@@ -162,48 +166,38 @@ async function composeListing({ apiKey, facts, comps, meta, itemCategory }: { ap
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
   
-  // Product-type-specific writing guidelines
-  const categoryGuidance = itemCategory === 'collectible' 
-    ? `COLLECTIBLE ITEM GUIDELINES:
-- Lead with manufacturer, catalog/model number, and official name
-- Emphasize authenticity marks, condition grading, and rarity
-- Include production dates, retirement status if known
-- Mention original packaging, certificates if applicable
-- Use collector terminology and condition standards`
-    : itemCategory === 'artwork'
-    ? `ARTWORK GUIDELINES:
-- Lead with artist name (if known), medium, and dimensions
-- Describe style, period, subject matter professionally
-- Include provenance, exhibition history if available
-- Mention frame, mounting, condition details
-- Use art market terminology and condition standards`
-    : itemCategory === 'sculpture'
-    ? `SCULPTURE GUIDELINES:
-- Lead with sculptor/artist, material, and dimensions
-- Describe technique (cast, carved, etc.) and finish
-- Include edition information, mounting requirements
-- Mention patina, condition, and display considerations
-- Use sculpture-specific terminology`
-    : `GENERAL ITEM GUIDELINES:
-- Lead with clear item identification and key features
-- Emphasize condition, authenticity, and notable characteristics
-- Include relevant historical or technical context
-- Use appropriate market terminology`
+  const prompt = `Write a professional marketplace listing for this ${itemCategory}.
 
-  const prompt = `Write marketplace listing. ${categoryGuidance}
+STYLE REQUIREMENTS:
+- Clean, professional tone (no bold markdown formatting)
+- Natural, flowing language (not template-like)
+- Focus on the item itself, not market comparisons
+- Be specific and descriptive about condition, features, authenticity
+- Write like a knowledgeable collector/dealer
 
-Facts: ${facts}
-Comps: ${JSON.stringify(comps)}
-Meta: ${JSON.stringify(meta)}
+CONTENT RULES:
+- Title: Brand, model number, descriptive name, key features (60-80 chars)
+- Description: Detailed item description focusing on condition, authenticity, dimensions, notable features (150-200 words)
+- Analysis: Separate section with pricing rationale using comparable data with numbered references [1], [2], etc.
 
-JSON only:
-{"listing_title": "Brand Model# Name - Category", "listing_description": "Brief description with key details, condition, dimensions. Reference comps [1].", "analysis_text": "Price range $X-Y based on [1] ${comps[0]?.site} $${comps[0]?.price_usd}."}`
+DO NOT mention other listings or prices in the main description.
+
+Item Details: ${facts}
+Market Research: ${JSON.stringify(comps, null, 2)}
+Additional Data: ${JSON.stringify(meta, null, 2)}
+
+Return JSON only:
+{
+  "listing_title": "Lladro 5073 Country Flowers Girl with Basket - Retired Porcelain Figurine",
+  "listing_description": "This charming Lladro porcelain figurine depicts a young peasant girl delicately picking flowers and carrying a wicker basket. Crafted in the classic Lladro style with exceptional attention to detail, this piece features the characteristic soft glazes and gentle expressions the brand is renowned for. The figurine shows excellent condition with authentic Lladro backstamp on the base confirming its authenticity. Dimensions measure approximately 20 cm in height. This retired piece represents fine Spanish porcelain craftsmanship and would make a beautiful addition to any collection.",
+  "analysis_text": "Current market value ranges $45-75 based on condition and rarity. Recent comparable sales include [1] eBay excellent condition $52, [2] LiveAuctioneers very good $48, [3] Heritage Auctions mint condition $68. Pricing reflects the retired status and collector demand for authentic Lladro figurines from this series."
+}`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
-      temperature: 0.2
+      temperature: 0.3
     },
   })
   const textOut = (resp as any)?.text || '{}'
