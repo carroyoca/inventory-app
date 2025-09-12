@@ -567,7 +567,8 @@ export async function POST(request: NextRequest) {
 
     try {
       // Single direct call with Search tool and JSON output
-      listing = await withTimeout(generateListingDirect({ apiKey, facts: desc, itemCategory }), 26000, 'listing direct')
+      // Allow more time on Vercel; keep under function maxDuration
+      listing = await withTimeout(generateListingDirect({ apiKey, facts: desc, itemCategory }), 45000, 'listing direct')
     } catch (e) {
       console.warn('⚠️ Direct generation failed, returning minimal fallback:', e)
       listing = { listing_title: '', listing_description: '', analysis_text: '', sources: [] }
@@ -599,6 +600,7 @@ export async function POST(request: NextRequest) {
       mode,
     })
     res.headers.set('X-List-Duration-ms', String(Date.now() - t0))
+    res.headers.set('X-List-Mode', mode)
     return res
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
@@ -607,4 +609,4 @@ export async function POST(request: NextRequest) {
 }
 
 export const runtime = 'nodejs'
-export const maxDuration = 30
+export const maxDuration = 120

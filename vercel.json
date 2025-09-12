@@ -12,7 +12,8 @@
     },
     "app/api/ai/generate-listing/route.ts": {
       "maxDuration": 120,
-      "memory": 1024
+      "memory": 1024,
+      "regions": ["fra1"]
     }
   },
   "headers": [
