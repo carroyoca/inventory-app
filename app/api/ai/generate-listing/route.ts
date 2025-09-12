@@ -126,13 +126,18 @@ async function callCompsWithSearch({ apiKey, facts, itemCategory }: { apiKey: st
   const productId = facts.split(';')[2]?.replace('product_id: ', '')?.trim() || ''
   const productName = facts.split(';')[0]?.replace('product_name: ', '')?.trim() || ''
   
-  // Ultra-focused, fast search prompt
-  const prompt = `URGENT: Find real sold listings for "${productName} ${productId}".
+  // Ultra-focused, fast search prompt with strict JSON enforcement
+  const prompt = `Search for sold listings of "${productName} ${productId}".
 
-Search eBay sold listings, recent auctions. Find 2-4 actual sales with prices.
+CRITICAL: Return ONLY valid JSON. No explanations, no comments, no text outside the JSON.
 
-Return JSON immediately:
-{"comps": [{"site": "eBay", "title": "real listing title", "price_usd": 50, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Lladro"}}`
+If you find sales data, return:
+{"comps": [{"site": "eBay", "title": "listing title", "price_usd": 50, "condition": "good", "confidence": "high"}], "meta": {"manufacturer": "Lladro"}}
+
+If no data found, return:
+{"comps": [], "meta": {}}
+
+JSON ONLY:`
 
   console.log('🔍 FOCUSED SEARCH:', `"${productName} ${productId}"`)
   console.log('🔍 Search timeout: Will wait up to 45 seconds for results')
@@ -150,8 +155,19 @@ Return JSON immediately:
     console.log('🔍 RAW SEARCH RESPONSE received')
     const textOut = (resp as any)?.text || '{}'
     console.log('🔍 Response text length:', textOut.length)
+    console.log('🔍 First 500 chars:', textOut.substring(0, 500))
     
-    const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(textOut)
+    // Extract JSON from response - look for first { to last }
+    let jsonText = textOut
+    const firstBrace = textOut.indexOf('{')
+    const lastBrace = textOut.lastIndexOf('}')
+    
+    if (firstBrace !== -1 && lastBrace !== -1 && lastBrace > firstBrace) {
+      jsonText = textOut.substring(firstBrace, lastBrace + 1)
+      console.log('🔍 Extracted JSON:', jsonText.substring(0, 200) + '...')
+    }
+    
+    const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(jsonText)
     console.log('🔍 Parsed comps count:', Array.isArray(parsed.comps) ? parsed.comps.length : 0)
     
     if (!Array.isArray(parsed.comps) || parsed.comps.length === 0) {
