@@ -2,11 +2,23 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { createServiceRoleClient } from '@/lib/supabase/api-client'
 import { GoogleGenAI, Modality } from '@google/genai'
 
+function safeHost(u: string) {
+  try { return new URL(u).host } catch { return 'unknown' }
+}
+
 async function fetchAsBase64(url: string) {
+  const start = Date.now()
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`Failed to fetch image: ${res.status}`)
+  const duration = Date.now() - start
+  if (!res.ok) {
+    console.error('IMG fetch failed', { status: res.status, host: safeHost(url), ms: duration })
+    throw new Error(`Failed to fetch image: ${res.status}`)
+  }
   const ab = await res.arrayBuffer()
-  const contentType = res.headers.get('content-type') || 'image/jpeg'
+  let contentType = res.headers.get('content-type') || 'image/jpeg'
+  const allowed = ['image/jpeg', 'image/jpg', 'image/png', 'image/webp']
+  if (!allowed.includes(contentType.toLowerCase())) contentType = 'image/jpeg'
+  console.log('IMG fetched', { host: safeHost(url), bytes: ab.byteLength, contentType, ms: duration })
   const base64 = Buffer.from(ab).toString('base64')
   return { base64, mimeType: contentType }
 }
@@ -28,6 +40,7 @@ async function withRetry<T>(fn: () => Promise<T>, attempts = 3, baseDelayMs = 40
 
 async function generateShot({ base64, mimeType, apiKey, instruction }: { base64: string; mimeType: string; apiKey: string; instruction: string }) {
   const ai = new GoogleGenAI({ apiKey })
+  const t0 = Date.now()
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash-image-preview',
     contents: {
@@ -41,11 +54,15 @@ async function generateShot({ base64, mimeType, apiKey, instruction }: { base64:
     },
     config: { responseModalities: [Modality.IMAGE, Modality.TEXT] },
   })
+  console.log('GEMINI image response received', { ms: Date.now() - t0 })
   const parts = resp?.candidates?.[0]?.content?.parts || []
   const imgPart = parts.find((p: any) => p.inlineData && p.inlineData.data)
   if (imgPart?.inlineData?.data) return imgPart.inlineData.data as string
   const textOut = (resp as any)?.text?.trim?.() || ''
-  if (textOut) throw new Error(`Gemini returned no image. Details: ${textOut}`)
+  if (textOut) {
+    console.error('GEMINI returned no image; text content present', { preview: textOut.slice(0, 200) })
+    throw new Error(`Gemini returned no image. Details: ${textOut}`)
+  }
   throw new Error('Gemini did not return image data')
 }
 
@@ -94,8 +111,9 @@ export async function POST(request: NextRequest) {
     }
 
     const t0 = Date.now()
-    // Keep retries bounded to fit Vercel function budget
-    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'), 2, 500)
+    console.log('IMG GEN start', { itemId, userId: user.id, host: safeHost(photoUrl) })
+    // Keep retries bounded to fit function budget
+    const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 12000, 'image fetch'), 2, 600)
     // Generate one faithful shot preserving the original angle/orientation
     const instruction = [
       'Respeta estrictamente el ángulo, orientación y encuadre originales.',
@@ -105,15 +123,22 @@ export async function POST(request: NextRequest) {
       'Solo limpia el fondo (blanco o pared neutra), mejora la iluminación de forma suave y el enfoque; elimina ruido/reflejos fuertes.',
       'Si necesitas más margen, amplía únicamente fondo neutro sin alterar el objeto ni su escala.',
     ].join(' ')
-    const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 20000, 'image generate'), 2, 600)
+    const t1 = Date.now()
+    const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 30000, 'image generate'), 2, 800)
+    const total = Date.now() - t0
+    console.log('IMG GEN success', { ms: total })
     const res = NextResponse.json({ success: true, url: `data:image/png;base64,${b64}` })
-    res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
+    res.headers.set('X-Gen-Duration-ms', String(total))
+    res.headers.set('X-Gen-Image-Mime', mimeType)
     return res
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err)
-    return NextResponse.json({ error: 'Generate image failed', details: msg }, { status: 500 })
+    console.error('IMG GEN failed', { error: msg })
+    const res = NextResponse.json({ error: 'Generate image failed', details: msg }, { status: 500 })
+    res.headers.set('X-Gen-Error', msg.slice(0, 200))
+    return res
   }
 }
 
 export const runtime = 'nodejs'
-export const maxDuration = 60
+export const maxDuration = 120
