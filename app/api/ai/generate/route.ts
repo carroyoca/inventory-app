@@ -54,7 +54,7 @@ async function callGeminiImageTransform({
           { inlineData: { data: base64, mimeType } },
           {
             text:
-              'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG.',
+              'Eres un fotógrafo profesional de catálogo. Mantén el marco original si existiera; no alteres la obra. Si no hay marco, fondo limpio tipo galería. Iluminación suave y enfoque nítido. Devuelve una fotografía realista del objeto en formato PNG. Respeta siempre la posición de la obra. No hagas ningung cambio en la figura o obra de arte',
           },
         ],
       },
