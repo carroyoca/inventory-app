@@ -76,6 +76,80 @@ function parseJsonLenient<T = any>(raw: string): T {
 }
 
 type ListingOut = { listing_title?: string; listing_description?: string; analysis_text?: string; sources?: { title?: string; url?: string }[] }
+type Comp = { site?: string; title?: string; date?: string; year?: number; condition?: string; price_usd?: number; url?: string }
+
+async function callCompsWithSearch({ apiKey, facts }: { apiKey: string; facts: string }): Promise<{ comps: Comp[]; meta: { sculptor?: string; issue_year?: number; retire_year?: number } }>
+{
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = `Task: Use Google Search to find comparable listings/sales and key metadata for the item.\nFacts: ${facts}\nReturn a compact JSON with comps (2–5 items) and optional meta fields.`
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      temperature: 0.3,
+      tools: [{ googleSearch: {} }],
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          comps: {
+            type: 'array',
+            items: {
+              type: 'object',
+              properties: {
+                site: { type: 'string' },
+                title: { type: 'string' },
+                date: { type: 'string' },
+                year: { type: 'number' },
+                condition: { type: 'string' },
+                price_usd: { type: 'number' },
+                url: { type: 'string' },
+              },
+            },
+          },
+          meta: {
+            type: 'object',
+            properties: {
+              sculptor: { type: 'string' },
+              issue_year: { type: 'number' },
+              retire_year: { type: 'number' },
+            },
+          },
+        },
+        required: ['comps'],
+      },
+    },
+  })
+  const textOut = (resp as any)?.text || '{}'
+  const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(textOut)
+  return { comps: Array.isArray(parsed.comps) ? parsed.comps : [], meta: parsed.meta || {} }
+}
+
+async function composeListing({ apiKey, facts, comps, meta }: { apiKey: string; facts: string; comps: Comp[]; meta: any }): Promise<ListingOut> {
+  const { GoogleGenAI } = await import('@google/genai')
+  const ai = new GoogleGenAI({ apiKey })
+  const prompt = `Compose a professional marketplace listing using the provided facts and comps.\nStyle: concise, collector-friendly, with bracketed references [n] mapped to comp order.\nOutput JSON only with keys: listing_title, listing_description, analysis_text.\nFacts: ${facts}\nMeta: ${JSON.stringify(meta)}\nCOMPS (index-based):\n${JSON.stringify(comps, null, 2)}`
+  const resp = await ai.models.generateContent({
+    model: 'gemini-2.0-flash',
+    contents: { parts: [{ text: prompt }] },
+    config: {
+      temperature: 0.3,
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: 'object',
+        properties: {
+          listing_title: { type: 'string' },
+          listing_description: { type: 'string' },
+          analysis_text: { type: 'string' },
+        },
+        required: ['listing_title', 'listing_description'],
+      },
+    },
+  })
+  const textOut = (resp as any)?.text || '{}'
+  return parseJsonLenient<ListingOut>(textOut)
+}
 
 async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
@@ -164,13 +238,23 @@ export async function POST(request: NextRequest) {
     const desc = factsParts.join('; ')
     const useSearch = body?.useSearch !== false
     let listing: ListingOut
-    let mode: 'search' | 'quick' = 'search'
+    let mode: 'search+compose' | 'quick' = 'search+compose'
     if (useSearch) {
       try {
-        listing = await withTimeout(callGeminiListingWithSearch({ apiKey, description: desc }), 22000, 'listing generate (search)')
+        const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc }), 18000, 'listing comps (search)')
+        if (Array.isArray(comps) && comps.length > 0) {
+          listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta }), 7000, 'listing compose')
+          const sources = comps
+            .filter((c) => c && (c.url || c.title || c.site))
+            .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
+          listing.sources = Array.isArray(sources) ? sources : []
+        } else {
+          mode = 'quick'
+          listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing generate (quick)')
+        }
       } catch (e) {
         mode = 'quick'
-        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 7000, 'listing generate (quick)')
+        listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing generate (quick)')
       }
     } else {
       mode = 'quick'
@@ -180,7 +264,7 @@ export async function POST(request: NextRequest) {
     // Validate listing fields; if missing/too short and we were in search mode, try quick fallback once
     const isEmpty = (s?: string) => !s || !String(s).trim()
     const tooShort = (s?: string, n = 60) => !s || String(s).trim().length < n
-    if (mode === 'search' && (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description))) {
+    if (mode === 'search+compose' && (isEmpty(listing?.listing_title) || tooShort(listing?.listing_description))) {
       try {
         const rescue = await withTimeout(callGeminiListingQuick({ apiKey, description: desc }), 8000, 'listing rescue (quick)')
         // Prefer rescue fields if they are more complete
