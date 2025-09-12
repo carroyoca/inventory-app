@@ -128,62 +128,46 @@ Conduct thorough research and return verified market data:`
 
   console.log('🔍 SEARCH PROMPT:', prompt.substring(0, 300) + '...')
 
+  const enhancedPrompt = `${prompt}
+
+CRITICAL: Return your response as valid JSON only, following this exact structure:
+{
+  "comps": [
+    {
+      "site": "website name",
+      "title": "item title", 
+      "date": "sale date",
+      "year": 2024,
+      "condition": "condition grade",
+      "price_usd": 150,
+      "url": "source url",
+      "confidence": "high"
+    }
+  ],
+  "meta": {
+    "artist": "sculptor name",
+    "manufacturer": "maker",
+    "series": "collection name",
+    "issue_year": 1985,
+    "retire_year": 2010,
+    "material": "porcelain"
+  },
+  "market_insights": {
+    "price_trend": "stable",
+    "market_activity": "active", 
+    "collector_interest": "high",
+    "authenticity_concerns": false
+  }
+}
+
+Provide 2-6 comparable items with accurate pricing and source information.`
+
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
-    contents: { parts: [{ text: prompt }] },
+    contents: { parts: [{ text: enhancedPrompt }] },
     config: {
       temperature: 0.1,
-      tools: [{ googleSearch: {} }],
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        propertyOrdering: ['comps', 'meta', 'market_insights'],
-        properties: {
-          comps: {
-            type: 'array',
-            minItems: 2,
-            maxItems: 6,
-            items: {
-              type: 'object',
-              propertyOrdering: ['site', 'title', 'date', 'year', 'condition', 'price_usd', 'url', 'confidence'],
-              properties: {
-                site: { type: 'string', description: 'Source website (eBay, LiveAuctioneers, etc.)' },
-                title: { type: 'string', description: 'Listing title' },
-                date: { type: 'string', description: 'Sale/listing date (MM/YYYY or MM/DD/YYYY)' },
-                year: { type: 'number', description: 'Year of sale/listing' },
-                condition: { type: 'string', description: 'Item condition (mint, excellent, good, fair, etc.)' },
-                price_usd: { type: 'number', description: 'Final sale price in USD' },
-                url: { type: 'string', description: 'Source URL if available' },
-                confidence: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Confidence in data accuracy' },
-              },
-              required: ['title', 'price_usd', 'confidence'],
-            },
-          },
-          meta: {
-            type: 'object',
-            properties: {
-              artist: { type: 'string', description: 'Artist/sculptor/designer name' },
-              manufacturer: { type: 'string', description: 'Manufacturer/maker company' },
-              series: { type: 'string', description: 'Product series/collection name' },
-              issue_year: { type: 'number', description: 'Year first issued/created' },
-              retire_year: { type: 'number', description: 'Year discontinued/retired' },
-              edition_size: { type: 'string', description: 'Edition size or production run info' },
-              material: { type: 'string', description: 'Primary materials used' },
-              origin_country: { type: 'string', description: 'Country of origin/manufacture' },
-            },
-          },
-          market_insights: {
-            type: 'object', 
-            properties: {
-              price_trend: { type: 'string', enum: ['increasing', 'stable', 'decreasing', 'volatile', 'insufficient_data'], description: 'Recent price trend' },
-              market_activity: { type: 'string', enum: ['active', 'moderate', 'limited', 'rare'], description: 'How frequently items appear for sale' },
-              collector_interest: { type: 'string', enum: ['high', 'medium', 'low', 'niche'], description: 'Level of collector demand' },
-              authenticity_concerns: { type: 'boolean', description: 'Whether reproductions/fakes are common' },
-            },
-          },
-        },
-        required: ['comps'],
-      },
+      tools: [{ googleSearch: {} }]
     },
   })
   
@@ -253,39 +237,20 @@ Item Facts: ${facts}
 Metadata: ${JSON.stringify(meta, null, 2)}
 Comparable Sales: ${JSON.stringify(comps, null, 2)}
 
-Compose compelling, accurate marketplace content:`
+Compose compelling, accurate marketplace content:
+
+CRITICAL: Return only valid JSON in this format:
+{
+  "listing_title": "SEO-friendly title here",
+  "listing_description": "Professional marketplace description with citations [1], [2]",
+  "analysis_text": "Price analysis: $MIN-$MAX range. Comparables: [1] Site - $price, [2] Site - $price. Rationale: explanation."
+}`
 
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
     config: {
-      temperature: 0.2,
-      responseMimeType: 'application/json',
-      responseSchema: {
-        type: 'object',
-        propertyOrdering: ['listing_title', 'listing_description', 'analysis_text'],
-        properties: {
-          listing_title: { 
-            type: 'string',
-            description: 'SEO-friendly marketplace title (60-80 characters)',
-            minLength: 10,
-            maxLength: 120
-          },
-          listing_description: { 
-            type: 'string',
-            description: 'Professional marketplace description (150-250 words)',
-            minLength: 100,
-            maxLength: 1000
-          },
-          analysis_text: { 
-            type: 'string',
-            description: 'Price analysis with comparable references',
-            minLength: 50,
-            maxLength: 500
-          },
-        },
-        required: ['listing_title', 'listing_description', 'analysis_text'],
-      },
+      temperature: 0.2
     },
   })
   const textOut = (resp as any)?.text || '{}'
