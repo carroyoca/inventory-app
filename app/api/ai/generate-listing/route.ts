@@ -23,10 +23,18 @@ function parseJsonLenient<T = any>(raw: string): T {
   }
   // First try raw
   let attempt = tryParse(raw)
-  if (attempt.ok) return attempt.value
+  if (attempt.ok) {
+    const v = attempt.value
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v[0]
+    return v
+  }
   // Remove code fences
   attempt = tryParse(trim(raw))
-  if (attempt.ok) return attempt.value
+  if (attempt.ok) {
+    const v = attempt.value
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v[0]
+    return v
+  }
   // Extract first JSON object block
   const match = raw.match(/\{[\s\S]*\}/)
   if (match) {
@@ -39,7 +47,11 @@ function parseJsonLenient<T = any>(raw: string): T {
     .replace(/\t/g, '\\t')
     .replace(/[\u0000-\u0019]/g, ' ')
   attempt = tryParse(escaped)
-  if (attempt.ok) return attempt.value
+  if (attempt.ok) {
+    const v = attempt.value
+    if (Array.isArray(v) && v.length > 0 && typeof v[0] === 'object') return v[0]
+    return v
+  }
   throw new Error(`Failed to parse JSON from model output: ${String((attempt.err as any)?.message || attempt.err)}\nSnippet: ${raw.slice(0, 300)}`)
 }
 
