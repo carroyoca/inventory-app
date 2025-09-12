@@ -126,6 +126,8 @@ Item Details: ${facts}
 
 Conduct thorough research and return verified market data:`
 
+  console.log('🔍 SEARCH PROMPT:', prompt.substring(0, 300) + '...')
+
   const resp = await ai.models.generateContent({
     model: 'gemini-2.5-flash',
     contents: { parts: [{ text: prompt }] },
@@ -184,8 +186,22 @@ Conduct thorough research and return verified market data:`
       },
     },
   })
+  
+  console.log('🔍 SEARCH RAW RESPONSE:', {
+    responseText: (resp as any)?.text?.substring(0, 500) + '...',
+    candidates: (resp as any)?.candidates?.length || 0,
+    groundingMetadata: (resp as any)?.candidates?.[0]?.groundingMetadata ? 'Present' : 'Missing'
+  })
+  
   const textOut = (resp as any)?.text || '{}'
   const parsed = parseJsonLenient<{ comps: Comp[]; meta?: any }>(textOut)
+  
+  console.log('🔍 PARSED SEARCH RESULTS:', {
+    compsCount: Array.isArray(parsed.comps) ? parsed.comps.length : 0,
+    hasValidComps: parsed.comps?.some(c => c.title && c.price_usd),
+    metaKeys: parsed.meta ? Object.keys(parsed.meta) : []
+  })
+  
   return { comps: Array.isArray(parsed.comps) ? parsed.comps : [], meta: parsed.meta || {} }
 }
 
@@ -696,23 +712,39 @@ export async function POST(request: NextRequest) {
     let listing: ListingOut
     let mode: 'search+compose' | 'quick' = 'search+compose'
     if (useSearch) {
+      console.log('🔍 SEARCH MODE: Attempting to use web search for listing generation')
+      console.log('🔍 Item category:', itemCategory)
+      console.log('🔍 Item facts:', desc.substring(0, 200) + '...')
+      
       try {
         const { comps, meta } = await withTimeout(callCompsWithSearch({ apiKey, facts: desc, itemCategory }), 18000, 'listing comps (search)')
+        
+        console.log('🔍 SEARCH RESULTS:', {
+          compsFound: Array.isArray(comps) ? comps.length : 0,
+          compsData: comps,
+          metaData: meta
+        })
+        
         if (Array.isArray(comps) && comps.length > 0) {
+          console.log('✅ Using search results for listing composition')
           listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 7000, 'listing compose')
           const sources = comps
             .filter((c) => c && (c.url || c.title || c.site))
             .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
           listing.sources = Array.isArray(sources) ? sources : []
         } else {
+          console.log('⚠️ No search results found, falling back to quick mode')
           mode = 'quick'
           listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 8000, 'listing generate (quick)')
         }
       } catch (e) {
+        console.log('❌ SEARCH ERROR:', e)
+        console.log('⚠️ Falling back to quick mode due to search error')
         mode = 'quick'
         listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 8000, 'listing generate (quick)')
       }
     } else {
+      console.log('🔍 QUICK MODE: Using offline generation (no search)')
       mode = 'quick'
       listing = await withTimeout(callGeminiListingQuick({ apiKey, description: desc, itemCategory }), 12000, 'listing generate (quick)')
     }
