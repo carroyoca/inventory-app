@@ -96,8 +96,15 @@ export async function POST(request: NextRequest) {
     const t0 = Date.now()
     // Keep retries bounded to fit Vercel function budget
     const { base64, mimeType } = await withRetry(() => withTimeout(fetchAsBase64(photoUrl), 10000, 'image fetch'), 2, 500)
-    // Generate only one shot per image (frontal) to keep it simple and fast
-    const instruction = 'Estilo frontal: toma principal, casi frontal, composición mínima, luz suave.'
+    // Generate one faithful shot preserving the original angle/orientation
+    const instruction = [
+      'Respeta estrictamente el ángulo, orientación y encuadre originales.',
+      'No cambies el punto de vista, no gires ni endereces la obra.',
+      'No inventes partes no visibles: reproduce el MISMO lado que muestra la foto (aunque sea la parte trasera o la base).',
+      'Mantén proporciones, pose y geometría exactas (manos, flores, cesta u otros detalles).',
+      'Solo limpia el fondo (blanco o pared neutra), mejora la iluminación de forma suave y el enfoque; elimina ruido/reflejos fuertes.',
+      'Si necesitas más margen, amplía únicamente fondo neutro sin alterar el objeto ni su escala.',
+    ].join(' ')
     const b64 = await withRetry(() => withTimeout(generateShot({ base64, mimeType, apiKey, instruction }), 20000, 'image generate'), 2, 600)
     const res = NextResponse.json({ success: true, url: `data:image/png;base64,${b64}` })
     res.headers.set('X-Gen-Duration-ms', String(Date.now() - t0))
