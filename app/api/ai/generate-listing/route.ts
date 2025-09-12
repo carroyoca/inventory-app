@@ -113,7 +113,10 @@ Return ONLY a valid JSON object:
     })
 
     console.log('🔍 Response received, extracting JSON...')
-    const text = response.text.trim()
+    const text = ((response as any)?.text?.trim?.() as string) || ''
+    if (!text) {
+      throw new Error('Empty response text from model')
+    }
     console.log('🔍 Response length:', text.length)
     console.log('🔍 First 200 chars:', text.substring(0, 200))
     
