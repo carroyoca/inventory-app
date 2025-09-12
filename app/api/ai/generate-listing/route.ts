@@ -21,16 +21,14 @@ type ListingOut = { listing_title?: string; listing_description?: string; analys
 async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `You are an expert appraiser and marketplace copywriter. Use Google Search to research the artist/work and comparable sales. First extract factual details, then write the listing using those facts. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English. MUST incorporate extracted facts such as product_id/serial, year/period, medium/materials, dimensions, condition, provenance/history, and notable context from sources, when available.\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on comparable works and signals. Reference key facts you extracted.\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const prompt = `Role: You are an expert appraiser and marketplace copywriter.\nGoal: Produce a professional listing backed by web research.\n\nFacts (from the item):\n${description}\n\nResearch plan (use Google Search tool):\n- Prioritize brand + catalog/model numbers when present (e.g., Lladró 4882).\n- Find issued/retired years, sculptor/designer, official/market names, typical dimensions.\n- Collect 3–5 comparable sold/listed items with site, title, date, condition, price, URL.\n- Prefer eBay sold/completed, LiveAuctioneers, Replacements, auction catalogues.\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject — sculptor/designer (if known)\",\n  \"listing_description\": \"2–3 short paragraphs (max ~220 words). Include maker/line, sculptor/designer (if known), model/catalog number, issue/retire dates, finish/materials, approx dimensions (cm and inches when available), condition cues, authenticity marks. Integrate 1–2 bracketed citations like [1], [2] tied to Sources order.\",\n  \"analysis_text\": \"Concise notes: estimated price range + reasoning citing key comps and condition differences.\",\n  \"sources\": [ {\"title\": \"string\", \"url\": \"string\"} ]\n}\nConstraints: If unknown, write \"Not Available\". Return JSON only.`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
-    config: { temperature: 0.6, tools: [{ googleSearch: {} }] },
+    config: { temperature: 0.6, tools: [{ googleSearch: {} }], responseMimeType: 'application/json' },
   })
   const textOut = (resp as any)?.text || ''
-  const match = textOut.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('Gemini listing response did not contain JSON')
-  const parsed = JSON.parse(match[0]) as ListingOut
+  const parsed = JSON.parse(textOut) as ListingOut
   const chunks = (resp as any)?.candidates?.[0]?.groundingMetadata?.groundingChunks || []
   const sources = chunks
     .map((c: any) => c?.web)
@@ -42,16 +40,14 @@ async function callGeminiListingWithSearch({ apiKey, description }: { apiKey: st
 async function callGeminiListingQuick({ apiKey, description }: { apiKey: string; description: string }): Promise<ListingOut> {
   const { GoogleGenAI } = await import('@google/genai')
   const ai = new GoogleGenAI({ apiKey })
-  const prompt = `You are an expert appraiser and marketplace copywriter. No web search. First extract factual details from the provided facts; then write the listing using those facts. Return ONLY a valid JSON in English with keys:\n{\n  \"listing_title\": \"SEO-ready marketplace listing title (include artist, style, medium)\",\n  \"listing_description\": \"Professional, persuasive multi-paragraph listing body in English. MUST incorporate extracted facts such as product_id/serial, year/period, medium/materials, dimensions, condition, provenance/history, when available.\",\n  \"analysis_text\": \"Concise internal notes in English: estimated price range and reasoning based on the provided facts\",\n  \"sources\": []\n}\nBe explicit if data is insufficient. Facts from the item: ${description}`
+  const prompt = `Role: Expert appraiser and marketplace copywriter.\nNo web search in this mode — use ONLY the provided facts.\n\nFacts (from the item):\n${description}\n\nReturn ONLY a JSON object with keys:\n{\n  \"listing_title\": \"[Brand] #[Model] 'Official/Market Name' — core subject\",\n  \"listing_description\": \"~150–180 words in 2 paragraphs. Incorporate model/catalog number, year/period if present, materials/finish, approx dimensions (cm and inches if available), condition, and authenticity marks.\",\n  \"analysis_text\": \"Price range and brief reasoning strictly from the provided facts.\",\n  \"sources\": []\n}\nConstraints: If unknown, write \"Not Available\". Return JSON only.`
   const resp = await ai.models.generateContent({
     model: 'gemini-2.0-flash',
     contents: { parts: [{ text: prompt }] },
-    config: { temperature: 0.5 },
+    config: { temperature: 0.5, responseMimeType: 'application/json' },
   })
   const textOut = (resp as any)?.text || ''
-  const match = textOut.match(/\{[\s\S]*\}/)
-  if (!match) throw new Error('Gemini listing response did not contain JSON')
-  const parsed = JSON.parse(match[0]) as ListingOut
+  const parsed = JSON.parse(textOut) as ListingOut
   return { ...parsed, sources: Array.isArray(parsed.sources) ? parsed.sources : [] }
 }
 
@@ -77,7 +73,7 @@ export async function POST(request: NextRequest) {
 
     const { data: item, error: itemErr } = await supabase
       .from('inventory_items')
-      .select('id, project_id, product_name, description, product_id')
+      .select('id, project_id, product_name, description, product_id, length_cm, width_cm, height_cm, weight_kg')
       .eq('id', itemId)
       .single()
     if (itemErr || !item) return NextResponse.json({ error: 'Item not found' }, { status: 404 })
@@ -92,7 +88,21 @@ export async function POST(request: NextRequest) {
       .maybeSingle()
     if (!membership) return NextResponse.json({ error: 'No access to this project' }, { status: 403 })
 
-    const desc = `product_name: ${item.product_name || ''}; description: ${item.description || ''}; product_id: ${(item as any).product_id ?? ''}; ${extraDescription || ''}`.trim()
+    // Build enriched facts string: use dimensions (cm + inches) and weight when available
+    const hasDims = [item.length_cm, item.width_cm, item.height_cm].every((v) => typeof v === 'number')
+    const dimsCm = hasDims ? `${item.length_cm} × ${item.width_cm} × ${item.height_cm} cm` : ''
+    const dimsIn = hasDims ? `${(item.length_cm! / 2.54).toFixed(1)} × ${(item.width_cm! / 2.54).toFixed(1)} × ${(item.height_cm! / 2.54).toFixed(1)} in` : ''
+    const weight = typeof item.weight_kg === 'number' ? `${item.weight_kg} kg` : ''
+    const factsParts = [
+      `product_name: ${item.product_name || ''}`,
+      `product_id: ${(item as any).product_id ?? ''}`,
+      `description: ${item.description || ''}`,
+      dimsCm && `dimensions_cm: ${dimsCm}`,
+      dimsIn && `dimensions_in: ${dimsIn}`,
+      weight && `weight_kg: ${weight}`,
+      extraDescription && `extra: ${extraDescription}`,
+    ].filter(Boolean) as string[]
+    const desc = factsParts.join('; ')
     const useSearch = body?.useSearch !== false
     let listing: ListingOut
     let mode: 'search' | 'quick' = 'search'
