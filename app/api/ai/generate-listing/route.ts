@@ -673,7 +673,7 @@ export async function POST(request: NextRequest) {
     }
     
     console.log('✅ Using search results for listing composition')
-    listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 25000, 'listing compose')
+    listing = await withTimeout(composeListing({ apiKey, facts: desc, comps, meta, itemCategory }), 15000, 'listing compose')
     const sources = comps
       .filter((c) => c && (c.url || c.title || c.site))
       .map((c) => ({ title: c.title || c.site || '', url: c.url || '' }))
