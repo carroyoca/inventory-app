@@ -445,7 +445,14 @@ Create accurate marketplace content based solely on available information:`
           },
           sources: { 
             type: 'array',
-            items: { type: 'object' }
+            items: {
+              type: 'object',
+              properties: {
+                title: { type: 'string' },
+                url: { type: 'string' }
+              },
+              required: ['title']
+            }
           }
         },
         required: ['listing_title', 'listing_description', 'analysis_text']
